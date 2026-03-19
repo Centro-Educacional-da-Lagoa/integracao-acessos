@@ -1,0 +1,23 @@
+node_modules/
+apps/*/node_modules/
+
+dist/
+apps/*/dist/
+coverage/
+
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+.DS_Store
+Thumbs.db
+
+*.tsbuildinfo
+
+Definição de Projeto-20260227175557.md:Zone.Identifier
