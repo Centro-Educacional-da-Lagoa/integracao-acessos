@@ -1,0 +1,33 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model SyncLog {
+  id          Int      @id @default(autoincrement())
+  traceId     String   @db.VarChar(100)
+  module      String   @db.VarChar(50)
+  action      String   @db.VarChar(50)
+  status      String   @db.VarChar(20)
+  metadata    String?  @db.NVarChar(max) // Armazena dados JSON do contexto do evento
+  createdAt   DateTime @default(now())
+
+  @@map("TB_INT_SyncLog")
+}
+
+model UserIntegrationState {
+  id              Int      @id @default(autoincrement())
+  totvsId         String   @unique @db.VarChar(100)
+  googleEmail     String?  @unique @db.VarChar(255)
+  status          String   @db.VarChar(50) // ACTIVE, SUSPENDED, PENDING_CREATION
+  lastSyncedAt    DateTime @default(now())
+
+  @@map("TB_INT_UserIntegrationState")
+}

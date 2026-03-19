@@ -1,0 +1,3 @@
+### Buscar usuário TOTVS pelo código (RA do aluno)
+### Substitua o código no final da URL pelo RA desejado
+GET http://localhost:3000/totvs/usuario/2026100999

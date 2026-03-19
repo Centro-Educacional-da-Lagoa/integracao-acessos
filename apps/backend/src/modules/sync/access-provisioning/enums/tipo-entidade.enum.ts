@@ -1,0 +1,5 @@
+export enum TipoEntidade {
+  ALUNO = 'ALUNO',
+  FUNCIONARIO = 'FUNCIONARIO',
+  RESPONSAVEL = 'RESPONSAVEL',
+}

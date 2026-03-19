@@ -1,0 +1,13 @@
+{
+  "name": "integracao-acessos",
+  "version": "1.0.0",
+  "description": "Integração de acessos entre TOTVS e outras plataformas",
+  "private": true,
+  "scripts": {
+    "dev:backend": "pnpm --filter backend dev",
+    "build:backend": "pnpm --filter backend build"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
