@@ -1,3 +1,27 @@
 ### Buscar usuário TOTVS pelo código (RA do aluno)
 ### Substitua o código no final da URL pelo RA desejado
 GET http://localhost:3000/totvs/usuario/2026100999
+
+###
+
+GET http://201.148.210.189:8052/rmsrestdataserver/rest/EduUsuarioFilialData/1$_$1$_$7$_$2019100186
+Authorization: Basic UG9ydGFsTWF0cmljdWxhSW50Oms4Szl5cnBINFpRVXZzVg==
+
+###
+
+POST http://201.148.210.189:8052/rmsrestdataserver/rest/EduUsuarioFilialData
+Authorization: Basic UG9ydGFsTWF0cmljdWxhSW50Oms4Szl5cnBINFpRVXZzVg==
+CODCOLIGADA: 1
+CODFILIAL: 2
+CODSISTEMA: "S"
+Content-Type: application/json
+
+{
+  "SUsuarioFilial": {
+    "CODCOLIGADA": 1,
+    "CODTIPOCURSO": 1,
+    "CODFILIAL": 2,
+    "CODUSUARIO": "75311568062",
+    "ACESSO": "1"
+  }
+}
