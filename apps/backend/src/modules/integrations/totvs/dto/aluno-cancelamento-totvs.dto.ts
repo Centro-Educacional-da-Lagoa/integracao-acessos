@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const AlunoCancelamentoTotvsSchema = z.object({
   CD_Coligada: z.number(),
+  CD_Filial: z.number().nullable().optional(),
   CD_Periodo_Letivo: z.string().nullable().optional(),
   CD_Pessoa: z.string(),
   CD_Registro_Academico: z.string(),

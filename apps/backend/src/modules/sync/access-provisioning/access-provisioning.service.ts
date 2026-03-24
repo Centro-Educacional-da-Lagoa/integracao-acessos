@@ -48,6 +48,8 @@ export class AccessProvisioningService {
     const { cdUsuarioFinal, dadosUsuario, perfisTransferiveis } =
       await this._garantirUsuario(ctx)
 
+    await this._garantirUsuarioFilial(ctx, cdUsuarioFinal)
+
     if (!dadosUsuario) {
       this.logger.warn(
         `[Provisioning] Dados do usuário ${cdUsuarioFinal} indisponíveis após garantia — pulando perfis`,
@@ -81,6 +83,8 @@ export class AccessProvisioningService {
       )
       return
     }
+
+    await this._revogarUsuarioFilial(ctx, ctx.CD_Usuario)
 
     if (this._deveInativarUsuarioNoCancelamento(ctx)) {
       const result = await this.totvsService.inativarUsuario(ctx.CD_Usuario)
@@ -118,6 +122,24 @@ export class AccessProvisioningService {
       !!ctx.IN_Existe_Matricula_Regular &&
       !ctx.IN_Inativo_Regular
     )
+  }
+
+  private _deveGerenciarEmailUsuarioAluno(ctx: PessoaAcessoContext): boolean {
+    return (
+      !!ctx.IN_Aluno &&
+      !ctx.IN_Funcionario &&
+      !ctx.IN_Responsavel &&
+      !!ctx.IN_Existe_Matricula_Regular &&
+      !ctx.IN_Inativo_Regular
+    )
+  }
+
+  private _resolverEmailAlvoUsuario(ctx: PessoaAcessoContext): string | null {
+    if (!this._deveGerenciarEmailUsuarioAluno(ctx)) {
+      return ctx.TX_Email_Usuario ?? null
+    }
+
+    return ctx.TX_Email_Institucional
   }
 
   private _isElegivelRevogacaoAluno(ctx: PessoaAcessoContext): boolean {
@@ -298,13 +320,14 @@ export class AccessProvisioningService {
       await this.totvsService.verificarUsuario(cdUsuarioCorreto)
 
     if (!usuarioExistente) {
+      const emailAlvoUsuario = this._resolverEmailAlvoUsuario(ctx)
       const result = await this.totvsService.criarUsuario(
         {
           cdUsuario: cdUsuarioCorreto,
           nome: ctx.NM_Pessoa,
           dtNascimento: ctx.DT_Nascimento,
         },
-        ctx.TX_Email_Institucional,
+        emailAlvoUsuario,
       )
       if (result.status === 'Error') {
         throw new Error(
@@ -312,10 +335,11 @@ export class AccessProvisioningService {
         )
       }
     } else if (usuarioExistente.STATUS !== 1) {
+      const emailAlvoUsuario = this._resolverEmailAlvoUsuario(ctx)
       const result = await this.totvsService.ativarUsuario(
         cdUsuarioCorreto,
         usuarioExistente.EMAIL ?? null,
-        ctx.TX_Email_Institucional,
+        emailAlvoUsuario,
       )
       if (result.status === 'Error') {
         throw new Error(
@@ -347,10 +371,11 @@ export class AccessProvisioningService {
     cdUsuario: string,
   ): Promise<any> {
     if (ctx.IN_Usuario_Ativo !== 1) {
+      const emailAlvoUsuario = this._resolverEmailAlvoUsuario(ctx)
       const result = await this.totvsService.ativarUsuario(
         cdUsuario,
         ctx.TX_Email_Usuario,
-        ctx.TX_Email_Institucional,
+        emailAlvoUsuario,
       )
       if (result.status === 'Error') {
         this.logger.warn(`[Usuário] Falha ao reativar usuário ${cdUsuario}`)
@@ -358,9 +383,7 @@ export class AccessProvisioningService {
     } else {
       // Atualiza email do usuário apenas para alunos com matrícula regular ativa
       const deveAtualizarEmail =
-        ctx.IN_Aluno &&
-        ctx.IN_Existe_Matricula_Regular &&
-        !ctx.IN_Inativo_Regular &&
+        this._deveGerenciarEmailUsuarioAluno(ctx) &&
         (!ctx.TX_Email_Usuario ||
           ctx.TX_Email_Usuario !== ctx.TX_Email_Institucional)
 
@@ -378,6 +401,59 @@ export class AccessProvisioningService {
     }
 
     return await this.totvsService.verificarUsuario(cdUsuario)
+  }
+
+  private async _garantirUsuarioFilial(
+    ctx: PessoaAcessoContext,
+    cdUsuario: string,
+  ): Promise<void> {
+    if (ctx.CD_Filial === null || ctx.CD_Filial === undefined) {
+      this.logger.warn(
+        `[UsuarioFilial] CD_Filial ausente para usuário ${cdUsuario} na coligada ${ctx.CD_Coligada} — etapa ignorada`,
+      )
+      return
+    }
+
+    const result = await this.totvsService.garantirUsuarioFilial({
+      cdColigada: ctx.CD_Coligada,
+      cdFilial: ctx.CD_Filial,
+      cdUsuario,
+      inFuncionario: ctx.IN_Funcionario,
+    })
+
+    if (result.status === 'Error') {
+      this.logger.warn(
+        `[UsuarioFilial] Falha ao garantir acesso usuário-filial para ${cdUsuario} (coligada ${ctx.CD_Coligada}, filial ${ctx.CD_Filial})`,
+      )
+    }
+  }
+
+  private async _revogarUsuarioFilial(
+    ctx: PessoaAcessoContext,
+    cdUsuario: string,
+  ): Promise<void> {
+    if (ctx.IN_Funcionario || ctx.IN_Responsavel) {
+      return
+    }
+
+    if (ctx.CD_Filial === null || ctx.CD_Filial === undefined) {
+      this.logger.warn(
+        `[UsuarioFilial] CD_Filial ausente para revogação do usuário ${cdUsuario} na coligada ${ctx.CD_Coligada} — etapa ignorada`,
+      )
+      return
+    }
+
+    const result = await this.totvsService.revogarUsuarioFilial({
+      cdColigada: ctx.CD_Coligada,
+      cdFilial: ctx.CD_Filial,
+      cdUsuario,
+    })
+
+    if (result.status === 'Error') {
+      this.logger.warn(
+        `[UsuarioFilial] Falha ao revogar acesso usuário-filial para ${cdUsuario} (coligada ${ctx.CD_Coligada}, filial ${ctx.CD_Filial})`,
+      )
+    }
   }
 
   // ─── Coleta e filtro de perfis ─────────────────────────────────────────────

@@ -16,6 +16,13 @@ interface TotvsApiResponse<T = any> {
   data: T
 }
 
+interface GarantirUsuarioFilialParams {
+  cdColigada: number
+  cdFilial: number
+  cdUsuario: string
+  inFuncionario: number
+}
+
 @Injectable()
 export class TotvsService {
   private readonly logger = new Logger(TotvsService.name)
@@ -244,6 +251,287 @@ export class TotvsService {
     }
   }
 
+  private _buildUsuarioFilialPk(
+    cdColigada: number,
+    cdFilial: number,
+    cdUsuario: string,
+  ): string {
+    return `${cdColigada}$_$${totvsApiConstants.codigoTipoCurso}$_$${cdFilial}$_$${cdUsuario}`
+  }
+
+  private _buildUsuarioFilialPayload(
+    cdColigada: number,
+    cdFilial: number,
+    cdUsuario: string,
+    acesso: string,
+  ) {
+    return {
+      SUsuarioFilial: {
+        CODCOLIGADA: cdColigada,
+        CODTIPOCURSO: Number(totvsApiConstants.codigoTipoCurso),
+        CODFILIAL: cdFilial,
+        CODUSUARIO: cdUsuario,
+        ACESSO: acesso,
+      },
+    }
+  }
+
+  private _getHeadersUsuarioFilial(
+    cdColigada: number,
+    cdFilial: number,
+  ): Record<string, string> {
+    return {
+      CODCOLIGADA: cdColigada.toString(),
+      CODFILIAL: cdFilial.toString(),
+      CODTIPOCURSO: totvsApiConstants.codigoTipoCurso,
+      CODSISTEMA: totvsApiConstants.codigoSistema,
+      Authorization: totvsApiConstants.authorization,
+    }
+  }
+
+  private _extrairAcessoUsuarioFilial(dados: any): string | null {
+    const fonte =
+      dados?.SUsuarioFilial ??
+      dados?.sUsuarioFilial ??
+      dados?.SUSUARIOFILIAL ??
+      dados
+
+    const acesso = fonte?.ACESSO
+    if (acesso === null || acesso === undefined) return null
+
+    const parsed = Number(acesso)
+    return Number.isNaN(parsed) ? null : parsed.toString()
+  }
+
+  private async _buscarUsuarioFilial(
+    cdColigada: number,
+    cdFilial: number,
+    cdUsuario: string,
+  ): Promise<any | false> {
+    const pk = this._buildUsuarioFilialPk(cdColigada, cdFilial, cdUsuario)
+
+    try {
+      const response = await axios({
+        method: 'get',
+        url: `${totvsApiConstants.urlAPI}/rmsrestdataserver/rest/EduUsuarioFilialData/${pk}`,
+        headers: this._getHeadersUsuarioFilial(cdColigada, cdFilial),
+      })
+
+      if (response.data?.messages?.length > 0) {
+        return false
+      }
+
+      return response.data?.data ?? false
+    } catch (error: any) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        return false
+      }
+
+      throw error
+    }
+  }
+
+  async garantirUsuarioFilial(
+    params: GarantirUsuarioFilialParams,
+  ): Promise<TotvsApiResponse> {
+    const { cdColigada, cdFilial, cdUsuario, inFuncionario } = params
+    const acesso = inFuncionario ? '2' : '1'
+    const pk = this._buildUsuarioFilialPk(cdColigada, cdFilial, cdUsuario)
+    const payload = this._buildUsuarioFilialPayload(
+      cdColigada,
+      cdFilial,
+      cdUsuario,
+      acesso,
+    )
+    const headers = this._getHeadersUsuarioFilial(cdColigada, cdFilial)
+
+    this.logger.log(
+      `[UsuarioFilial] Garantindo acesso para usuário ${cdUsuario} (coligada ${cdColigada}, filial ${cdFilial}, acesso ${acesso})`,
+    )
+
+    try {
+      const existente = await this._buscarUsuarioFilial(
+        cdColigada,
+        cdFilial,
+        cdUsuario,
+      )
+      const acessoAtual = this._extrairAcessoUsuarioFilial(existente)
+
+      if (acessoAtual === acesso) {
+        this.logger.log(
+          `[UsuarioFilial] Acesso já consistente para ${cdUsuario} na PK ${pk} — skip`,
+        )
+        return { status: 'Sucesso', data: existente }
+      }
+
+      const urlComPk = `${totvsApiConstants.urlAPI}/rmsrestdataserver/rest/EduUsuarioFilialData/${pk}`
+      const urlSemPk = `${totvsApiConstants.urlAPI}/rmsrestdataserver/rest/EduUsuarioFilialData`
+      let response: any
+
+      if (existente) {
+        try {
+          response = await axios({
+            method: 'patch',
+            url: urlComPk,
+            headers,
+            data: payload,
+          })
+        } catch (error) {
+          if (axios.isAxiosError(error) && error.response?.status === 404) {
+            response = await axios({
+              method: 'post',
+              url: urlSemPk,
+              headers,
+              data: payload,
+            })
+          } else {
+            throw error
+          }
+        }
+      } else {
+        try {
+          response = await axios({
+            method: 'post',
+            url: urlSemPk,
+            headers,
+            data: payload,
+          })
+        } catch (error) {
+          if (
+            axios.isAxiosError(error) &&
+            [400, 404, 409].includes(error.response?.status ?? 0)
+          ) {
+            response = await axios({
+              method: 'patch',
+              url: urlComPk,
+              headers,
+              data: payload,
+            })
+          } else {
+            throw error
+          }
+        }
+      }
+
+      this.handleTotvsResponse(
+        response,
+        `garantirUsuarioFilial usuario=${cdUsuario} pk=${pk}`,
+      )
+
+      this.logger.log(
+        `[UsuarioFilial] Acesso garantido para ${cdUsuario} na coligada ${cdColigada}, filial ${cdFilial}`,
+      )
+
+      return { status: 'Sucesso', data: response.data }
+    } catch (error: any) {
+      this.logger.error('------------------------------------')
+      this.logger.error(
+        `[UsuarioFilial] ERRO AO GARANTIR ACESSO DO USUÁRIO ${cdUsuario}:`,
+      )
+
+      if (axios.isAxiosError(error)) {
+        this.logger.error(error.response?.data)
+      } else {
+        this.logger.error(error)
+      }
+
+      this.logger.error('PAYLOAD:')
+      this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error('------------------------------------')
+
+      return {
+        status: 'Error',
+        data:
+          axios.isAxiosError(error) && error.response
+            ? error.response.data
+            : error,
+      }
+    }
+  }
+
+  async revogarUsuarioFilial(params: {
+    cdColigada: number
+    cdFilial: number
+    cdUsuario: string
+  }): Promise<TotvsApiResponse> {
+    const { cdColigada, cdFilial, cdUsuario } = params
+    const acesso = '0'
+    const pk = this._buildUsuarioFilialPk(cdColigada, cdFilial, cdUsuario)
+    const payload = this._buildUsuarioFilialPayload(
+      cdColigada,
+      cdFilial,
+      cdUsuario,
+      acesso,
+    )
+
+    this.logger.log(
+      `[UsuarioFilial] Revogando acesso para usuário ${cdUsuario} (coligada ${cdColigada}, filial ${cdFilial})`,
+    )
+
+    try {
+      const existente = await this._buscarUsuarioFilial(
+        cdColigada,
+        cdFilial,
+        cdUsuario,
+      )
+      if (!existente) {
+        this.logger.log(
+          `[UsuarioFilial] Registro não encontrado para ${cdUsuario} na PK ${pk} — skip`,
+        )
+        return { status: 'Sucesso', data: null }
+      }
+
+      const acessoAtual = this._extrairAcessoUsuarioFilial(existente)
+      if (acessoAtual === acesso) {
+        this.logger.log(
+          `[UsuarioFilial] Acesso já revogado para ${cdUsuario} na PK ${pk} — skip`,
+        )
+        return { status: 'Sucesso', data: existente }
+      }
+
+      const response = await axios({
+        method: 'patch',
+        url: `${totvsApiConstants.urlAPI}/rmsrestdataserver/rest/EduUsuarioFilialData/${pk}`,
+        headers: this._getHeadersUsuarioFilial(cdColigada, cdFilial),
+        data: payload,
+      })
+
+      this.handleTotvsResponse(
+        response,
+        `revogarUsuarioFilial usuario=${cdUsuario} pk=${pk}`,
+      )
+
+      this.logger.log(
+        `[UsuarioFilial] Acesso revogado para ${cdUsuario} na coligada ${cdColigada}, filial ${cdFilial}`,
+      )
+
+      return { status: 'Sucesso', data: response.data }
+    } catch (error: any) {
+      this.logger.error('------------------------------------')
+      this.logger.error(
+        `[UsuarioFilial] ERRO AO REVOGAR ACESSO DO USUÁRIO ${cdUsuario}:`,
+      )
+
+      if (axios.isAxiosError(error)) {
+        this.logger.error(error.response?.data)
+      } else {
+        this.logger.error(error)
+      }
+
+      this.logger.error('PAYLOAD:')
+      this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error('------------------------------------')
+
+      return {
+        status: 'Error',
+        data:
+          axios.isAxiosError(error) && error.response
+            ? error.response.data
+            : error,
+      }
+    }
+  }
+
   /**
    * Vincula um usuário já existente no TOTVS à ficha da pessoa do aluno.
    * Usado quando CD_Usuario é nulo na view mas o usuário já existe em GlbUsuarioData.
@@ -321,7 +609,7 @@ export class TotvsService {
    */
   async criarUsuario(
     dados: { cdUsuario: string; nome: string; dtNascimento: string | null },
-    email: string,
+    email: string | null,
   ): Promise<TotvsApiResponse> {
     const { cdUsuario, nome, dtNascimento } = dados
 
@@ -335,15 +623,18 @@ export class TotvsService {
     // Data de início: data atual no formato ISO (YYYY-MM-DD)
     const dataInicio = new Date().toISOString().split('T')[0]
 
-    const payload = {
+    const payload: Record<string, unknown> = {
       CODUSUARIO: cdUsuario,
       NOME: nome,
       DATAINICIO: dataInicio,
       SENHA: senhaFormatada,
       CODACESSO: 'Acesso03',
-      EMAIL: email,
       OBRIGAALTERARSENHA: 'F',
       ACESSONET: 'T',
+    }
+
+    if (email) {
+      payload.EMAIL = email
     }
 
     this.logger.debug(
@@ -404,21 +695,20 @@ export class TotvsService {
   async ativarUsuario(
     cdUsuario: string,
     emailAtual: string | null,
-    emailEsperado: string,
+    emailEsperado: string | null,
   ): Promise<TotvsApiResponse> {
-    const emailCorreto = emailAtual && emailAtual === emailEsperado
-
     const payload: Record<string, unknown> = { STATUS: 1 }
 
-    if (!emailCorreto) {
+    const deveAtualizarEmail =
+      !!emailEsperado && (!emailAtual || emailAtual !== emailEsperado)
+
+    if (deveAtualizarEmail) {
       payload.EMAIL = emailEsperado
       this.logger.log(
         `Reativando usuário ${cdUsuario} e atualizando email para ${emailEsperado}`,
       )
     } else {
-      this.logger.log(
-        `Reativando usuário ${cdUsuario} (email já correto: ${emailEsperado})`,
-      )
+      this.logger.log(`Reativando usuário ${cdUsuario} sem alteração de email`)
     }
 
     try {

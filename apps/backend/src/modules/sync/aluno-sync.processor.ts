@@ -204,6 +204,7 @@ export class AlunoSyncProcessor {
       IN_Inativo_Regular: aluno.IN_Inativo_Regular,
       IN_Inativo_Extra: 0,
       CD_Coligada: coligada.id,
+      CD_Filial: aluno.CD_Filial ?? null,
       NM_Dominio_Email_Institucional: coligada.domain,
       TX_Email_Institucional: email,
     }
@@ -299,6 +300,7 @@ export class AlunoSyncProcessor {
       IN_Inativo_Regular: alunoCancelamento.IN_Inativo_Regular,
       IN_Inativo_Extra: alunoCancelamento.IN_Inativo_Extra,
       CD_Coligada: coligada.id,
+      CD_Filial: alunoCancelamento.CD_Filial ?? null,
       NM_Dominio_Email_Institucional: coligada.domain,
       TX_Email_Institucional: email,
     }

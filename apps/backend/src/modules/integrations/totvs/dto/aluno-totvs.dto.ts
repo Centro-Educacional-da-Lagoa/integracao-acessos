@@ -4,6 +4,9 @@ export const AlunoTotvsSchema = z.object({
   /** Código da coligada */
   CD_Coligada: z.number(),
 
+  /** Código da filial */
+  CD_Filial: z.number().nullable().optional(),
+
   /** Código da pessoa no TOTVS */
   CD_Pessoa: z.string(),
 

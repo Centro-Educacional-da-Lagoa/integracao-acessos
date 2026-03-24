@@ -55,6 +55,9 @@ export interface PessoaAcessoContext {
   /** Código da coligada */
   CD_Coligada: number
 
+  /** Código da filial */
+  CD_Filial?: number | null
+
   /** Domínio institucional configurado para a coligada */
   NM_Dominio_Email_Institucional: string
 
