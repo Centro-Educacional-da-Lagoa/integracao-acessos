@@ -7,6 +7,9 @@ import { randomUUID } from 'crypto'
     PinoLoggerModule.forRoot({
       pinoHttp: {
         level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
+        autoLogging: {
+          ignore: (req) => !!req.url && req.url.startsWith('/_next/webpack-hmr'),
+        },
         genReqId: (req) => {
           return req.headers['x-trace-id'] || randomUUID()
         },

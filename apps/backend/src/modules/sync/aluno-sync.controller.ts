@@ -8,10 +8,8 @@ import {
   Post,
 } from '@nestjs/common'
 import { AlunoSyncService } from './aluno-sync.service'
-import {
-  CancelamentoAlunoSchema,
-  CancelamentoLoteSchema,
-} from './dto/aluno-cancelamento.dto'
+import { CancelamentoAlunoSchema } from './dto/aluno-cancelamento.dto'
+import { WebhookAlunoSchema } from './dto/aluno-webhook.dto'
 import { ZodError } from 'zod'
 
 @Controller()
@@ -38,27 +36,17 @@ export class AlunoSyncController {
 
   @Post('sync/alunos/cancelamentos')
   @HttpCode(HttpStatus.ACCEPTED)
-  async triggerCancelamentoLote(
-    @Body() body: unknown,
-  ): Promise<{ message: string }> {
-    const payload = this.parseBody(body, CancelamentoLoteSchema)
-
+  async triggerCancelamentoLote(): Promise<{ message: string }> {
     this.logger.log(
-      `Cancelamento em lote disparado para coligada ${payload.CD_Coligada}`,
+      'Cancelamento em lote disparado manualmente via API para todas as coligadas configuradas',
     )
 
-    this.alunoSyncService
-      .syncCancelamentosColigada(
-        payload.CD_Periodo_Letivo,
-        payload.CD_Coligada,
-        'BATCH',
+    this.alunoSyncService.syncCancelamentosPorColigada().catch((error) => {
+      this.logger.error(
+        'Falha crítica no cancelamento em lote de alunos',
+        error,
       )
-      .catch((error) => {
-        this.logger.error(
-          'Falha crítica no cancelamento em lote de alunos',
-          error,
-        )
-      })
+    })
 
     return { message: 'Cancelamento de acessos de alunos iniciado.' }
   }
@@ -82,6 +70,26 @@ export class AlunoSyncController {
     })
 
     return { message: 'Cancelamento unitário de acesso iniciado.' }
+  }
+
+  @Post('webhooks/alunos')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async triggerWebhookAluno(
+    @Body() body: unknown,
+  ): Promise<{ message: string }> {
+    console.log('🚀 ~ AlunoSyncController ~ triggerWebhookAluno ~ body:', body)
+    const payload = this.parseBody(body, WebhookAlunoSchema)
+
+    this.logger.log(
+      `Webhook de aluno recebido para RA ${payload.CD_Registro_Academico}`,
+    )
+
+    await this.alunoSyncService.syncWebhookAluno(payload)
+
+    return {
+      message:
+        'Webhook unitário recebido. Cancelamento e concessão foram enfileirados.',
+    }
   }
 
   private parseBody<T extends { parse: (input: unknown) => unknown }>(

@@ -19,6 +19,20 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.getResponse()
         : 'Internal server error';
 
+    const isNextHmrRequest =
+      request?.url?.startsWith('/_next/webpack-hmr') &&
+      status === HttpStatus.NOT_FOUND;
+
+    if (isNextHmrRequest) {
+      response.status(status).json({
+        statusCode: status,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+        message,
+      });
+      return;
+    }
+
     // O request.headers['x-trace-id'] garante que ligaremos esse erro c/ o trace gerado no interceptor/cron
     this.logger.error(
       {

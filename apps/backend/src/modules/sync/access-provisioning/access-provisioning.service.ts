@@ -120,7 +120,7 @@ export class AccessProvisioningService {
       !ctx.IN_Funcionario &&
       !ctx.IN_Responsavel &&
       !!ctx.IN_Existe_Matricula_Regular &&
-      !ctx.IN_Inativo_Regular
+      !ctx.IN_Existe_Matricula_Extra
     )
   }
 
@@ -130,7 +130,7 @@ export class AccessProvisioningService {
       !ctx.IN_Funcionario &&
       !ctx.IN_Responsavel &&
       !!ctx.IN_Existe_Matricula_Regular &&
-      !ctx.IN_Inativo_Regular
+      !!ctx.IN_Existe_Matricula_Extra
     )
   }
 
@@ -165,8 +165,10 @@ export class AccessProvisioningService {
       ctx.IN_Usuario_Ativo === 1 &&
       !ctx.IN_Funcionario &&
       !ctx.IN_Responsavel &&
-      !!ctx.IN_Inativo_Regular &&
-      !!ctx.IN_Inativo_Extra
+      (!ctx.IN_Existe_Matricula_Regular ||
+        (!!ctx.IN_Inativo_Regular && !!ctx.IN_Existe_Matricula_Regular)) &&
+      (!ctx.IN_Existe_Matricula_Extra ||
+        (!!ctx.IN_Inativo_Extra && !!ctx.IN_Existe_Matricula_Extra))
     )
   }
 
@@ -176,8 +178,10 @@ export class AccessProvisioningService {
     return (
       !!ctx.CD_Usuario &&
       !this._deveInativarUsuarioNoCancelamento(ctx) &&
-      !!ctx.IN_Inativo_Regular &&
-      !!ctx.IN_Inativo_Extra
+      (!ctx.IN_Existe_Matricula_Regular ||
+        (!!ctx.IN_Inativo_Regular && !!ctx.IN_Existe_Matricula_Regular)) &&
+      (!ctx.IN_Existe_Matricula_Extra ||
+        (!!ctx.IN_Inativo_Extra && !!ctx.IN_Existe_Matricula_Extra))
     )
   }
 
@@ -685,8 +689,13 @@ export class AccessProvisioningService {
       }
 
       const gpermisAtual: any[] = dadosUsuario.GPERMIS ?? []
-      let houveMudanca = false
 
+      console.log(
+        '🚀 ~ AccessProvisioningService ~ _removerPerfisPorEntidade ~ gpermisAtual:',
+        JSON.stringify(gpermisAtual, null, 2),
+      )
+
+      let houveMudanca = false
       const gpermisAtualizado = gpermisAtual
         .map((permissao) => {
           const perfisAtuais = permissao.GUSRPERFIL ?? []
@@ -716,6 +725,15 @@ export class AccessProvisioningService {
           }
         })
         .filter(Boolean)
+
+      console.log(
+        '🚀 ~ AccessProvisioningService ~ _removerPerfisPorEntidade ~ gpermisAtualizado:',
+        JSON.stringify(gpermisAtualizado, null, 2),
+      )
+      console.log(
+        '🚀 ~ AccessProvisioningService ~ _removerPerfisPorEntidade ~ houveMudanca:',
+        houveMudanca,
+      )
 
       if (!houveMudanca) {
         this.logger.log(

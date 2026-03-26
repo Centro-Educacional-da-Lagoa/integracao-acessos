@@ -29,13 +29,20 @@ export interface CancelamentoAlunoJobData {
   CD_Periodo_Letivo: string
   CD_Registro_Academico: string
   coligada: ColigadaConfig
-  TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO'
+  TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' | 'WEBHOOK'
   aluno?: AlunoCancelamentoTotvsDto
+}
+
+export interface WebhookAlunoJobData {
+  CD_Periodo_Letivo: string
+  CD_Registro_Academico: string
+  coligada: ColigadaConfig
 }
 
 @Processor('aluno-sync')
 export class AlunoSyncProcessor {
   private readonly logger = new Logger(AlunoSyncProcessor.name)
+  private static readonly COLIGADAS_BLOQUEADAS_PROCEDURE = new Set([6])
 
   constructor(
     @InjectQueue('aluno-sync') private readonly alunoSyncQueue: Queue,
@@ -126,17 +133,67 @@ export class AlunoSyncProcessor {
     )
   }
 
+  @Process('webhook-aluno')
+  async handleWebhookAluno(job: Job<WebhookAlunoJobData>): Promise<void> {
+    const { CD_Periodo_Letivo, CD_Registro_Academico, coligada } = job.data
+
+    if (this.isProcedureBlockedColigada(coligada.id)) {
+      this.logger.warn(
+        `[Job ${job.id}] [Webhook] Coligada ${coligada.id} bloqueada para execução de procedure`,
+      )
+      return
+    }
+
+    this.logger.log(
+      `[Job ${job.id}] [Webhook] Iniciando processamento do aluno ${CD_Registro_Academico} (coligada ${coligada.id}, período ${CD_Periodo_Letivo})`,
+    )
+
+    await this.syncCancelamentoAluno({
+      coligada,
+      CD_Periodo_Letivo,
+      CD_Registro_Academico,
+      TP_Origem_Disparo: 'WEBHOOK',
+    })
+
+    const alunoAtivo = await this.totvsService.fetchAlunoAtivo(
+      CD_Periodo_Letivo,
+      coligada.id,
+      CD_Registro_Academico,
+    )
+
+    if (!alunoAtivo) {
+      this.logger.warn(
+        `[Webhook] Aluno ${CD_Registro_Academico} não encontrado na procedure de ativação para a coligada ${coligada.id}`,
+      )
+      return
+    }
+
+    await this.syncAluno(alunoAtivo, coligada)
+
+    this.logger.log(
+      `[Job ${job.id}] [Webhook] Processamento concluído para aluno ${CD_Registro_Academico}`,
+    )
+  }
+
   // ─── Métodos privados de sincronização ────────────────────────────────────────
 
   private async syncColigada(
     periodoLetivo: string,
     coligada: ColigadaConfig,
   ): Promise<void> {
+    if (this.isProcedureBlockedColigada(coligada.id)) {
+      this.logger.warn(
+        `[Coligada ${coligada.id}] Execução de procedure bloqueada por regra de negócio`,
+      )
+      return
+    }
+
     this.logger.log(`[Coligada ${coligada.id}] Buscando alunos ativos...`)
 
     const alunos = await this.totvsService.fetchAlunosAtivos(
       periodoLetivo,
       coligada.id,
+      null,
     )
 
     this.logger.log(
@@ -217,6 +274,13 @@ export class AlunoSyncProcessor {
     coligada: ColigadaConfig,
     TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO',
   ): Promise<void> {
+    if (this.isProcedureBlockedColigada(coligada.id)) {
+      this.logger.warn(
+        `[Coligada ${coligada.id}] Execução de procedure de cancelamento bloqueada por regra de negócio`,
+      )
+      return
+    }
+
     this.logger.log(
       `[Coligada ${coligada.id}] Buscando alunos para cancelamento...`,
     )
@@ -224,6 +288,7 @@ export class AlunoSyncProcessor {
     const alunos = await this.totvsService.fetchAlunosCancelamento(
       CD_Periodo_Letivo,
       coligada.id,
+      null,
     )
 
     this.logger.log(
@@ -261,6 +326,13 @@ export class AlunoSyncProcessor {
     CD_Registro_Academico,
     TP_Origem_Disparo,
   }: CancelamentoAlunoJobData): Promise<void> {
+    if (this.isProcedureBlockedColigada(coligada.id)) {
+      this.logger.warn(
+        `[Cancelamento] Coligada ${coligada.id} bloqueada para execução de procedure`,
+      )
+      return
+    }
+
     const alunoCancelamento =
       aluno ??
       (await this.totvsService.fetchAlunoCancelamento(
@@ -298,6 +370,7 @@ export class AlunoSyncProcessor {
       IN_Existe_Matricula_Regular:
         alunoCancelamento.IN_Existe_Matricula_Regular,
       IN_Inativo_Regular: alunoCancelamento.IN_Inativo_Regular,
+      IN_Existe_Matricula_Extra: alunoCancelamento.IN_Existe_Matricula_Extra,
       IN_Inativo_Extra: alunoCancelamento.IN_Inativo_Extra,
       CD_Coligada: coligada.id,
       CD_Filial: alunoCancelamento.CD_Filial ?? null,
@@ -306,5 +379,9 @@ export class AlunoSyncProcessor {
     }
 
     await this.accessProvisioningService.revogarAcesso(ctx)
+  }
+
+  private isProcedureBlockedColigada(CD_Coligada: number): boolean {
+    return AlunoSyncProcessor.COLIGADAS_BLOQUEADAS_PROCEDURE.has(CD_Coligada)
   }
 }

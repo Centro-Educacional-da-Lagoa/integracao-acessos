@@ -49,6 +49,8 @@ export interface PessoaAcessoContext {
   /** 1 = matrícula regular inativa */
   IN_Inativo_Regular: number
 
+  IN_Existe_Matricula_Extra?: number
+
   /** 1 = inativação extra acadêmica */
   IN_Inativo_Extra: number
 

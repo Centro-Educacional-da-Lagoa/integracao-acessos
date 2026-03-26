@@ -27,6 +27,7 @@ interface GarantirUsuarioFilialParams {
 export class TotvsService {
   private readonly logger = new Logger(TotvsService.name)
   private readonly tableCorpore = getTotvsTableName()
+  private static readonly COLIGADAS_BLOQUEADAS_PROCEDURE = new Set([6])
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -78,14 +79,20 @@ export class TotvsService {
   async fetchAlunosAtivos(
     periodoLetivo: string,
     coligada: number,
+    CD_Registro_Academico: string | null = null,
   ): Promise<AlunoTotvsDto[]> {
+    this.assertProcedureColigadaPermitida(coligada)
+
+    const periodoLetivoEscapado = periodoLetivo.replace(/'/g, "''")
+    const registroAcademicoSql = this.toSqlStringOrNull(CD_Registro_Academico)
+
     this.logger.log(
       `Buscando alunos ativos — coligada ${coligada}, período ${periodoLetivo}`,
     )
 
     const result = await this.prisma.$queryRawUnsafe<AlunoTotvsDto[]>(
       `
-      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Aluno_Ativacao_Acesso] '${periodoLetivo}', ${coligada}`,
+      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Aluno_Ativacao_Acesso] '${periodoLetivoEscapado}', ${coligada}, ${registroAcademicoSql}`,
     )
 
     this.logger.log(
@@ -97,7 +104,13 @@ export class TotvsService {
   async fetchAlunosCancelamento(
     CD_Periodo_Letivo: string,
     CD_Coligada: number,
+    CD_Registro_Academico: string | null = null,
   ): Promise<AlunoCancelamentoTotvsDto[]> {
+    this.assertProcedureColigadaPermitida(CD_Coligada)
+
+    const periodoLetivoEscapado = CD_Periodo_Letivo.replace(/'/g, "''")
+    const registroAcademicoSql = this.toSqlStringOrNull(CD_Registro_Academico)
+
     this.logger.log(
       `Buscando alunos para cancelamento — coligada ${CD_Coligada}, período ${CD_Periodo_Letivo}`,
     )
@@ -106,7 +119,7 @@ export class TotvsService {
       AlunoCancelamentoTotvsDto[]
     >(
       `
-      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso] '${CD_Periodo_Letivo.replace(/'/g, "''")}', ${CD_Coligada}`,
+      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso] '${periodoLetivoEscapado}', ${CD_Coligada}, ${registroAcademicoSql}`,
     )
 
     this.logger.log(
@@ -114,6 +127,24 @@ export class TotvsService {
     )
 
     return result
+  }
+
+  async fetchAlunoAtivo(
+    CD_Periodo_Letivo: string,
+    CD_Coligada: number,
+    CD_Registro_Academico: string,
+  ): Promise<AlunoTotvsDto | null> {
+    const alunos = await this.fetchAlunosAtivos(
+      CD_Periodo_Letivo,
+      CD_Coligada,
+      CD_Registro_Academico,
+    )
+
+    return (
+      alunos.find(
+        (aluno) => aluno.CD_Registro_Academico === CD_Registro_Academico,
+      ) ?? null
+    )
   }
 
   async fetchAlunoCancelamento(
@@ -124,6 +155,7 @@ export class TotvsService {
     const alunos = await this.fetchAlunosCancelamento(
       CD_Periodo_Letivo,
       CD_Coligada,
+      CD_Registro_Academico,
     )
 
     return (
@@ -131,6 +163,20 @@ export class TotvsService {
         (aluno) => aluno.CD_Registro_Academico === CD_Registro_Academico,
       ) ?? null
     )
+  }
+
+  private toSqlStringOrNull(value: string | null): string {
+    if (!value) return 'NULL'
+
+    return `'${value.replace(/'/g, "''")}'`
+  }
+
+  private assertProcedureColigadaPermitida(CD_Coligada: number): void {
+    if (TotvsService.COLIGADAS_BLOQUEADAS_PROCEDURE.has(CD_Coligada)) {
+      throw new Error(
+        `Coligada ${CD_Coligada} não é elegível para execução de procedure.`,
+      )
+    }
   }
 
   // ─── Requisições à API REST do TOTVS ─────────────────────────────────────────
@@ -266,13 +312,11 @@ export class TotvsService {
     acesso: string,
   ) {
     return {
-      SUsuarioFilial: {
-        CODCOLIGADA: cdColigada,
-        CODTIPOCURSO: Number(totvsApiConstants.codigoTipoCurso),
-        CODFILIAL: cdFilial,
-        CODUSUARIO: cdUsuario,
-        ACESSO: acesso,
-      },
+      CODCOLIGADA: cdColigada,
+      CODTIPOCURSO: Number(totvsApiConstants.codigoTipoCurso),
+      CODFILIAL: cdFilial,
+      CODUSUARIO: cdUsuario,
+      ACESSO: acesso,
     }
   }
 
@@ -880,16 +924,22 @@ export class TotvsService {
     gpermisAtualizado: any[],
     dadosUsuarioSistema: any,
   ): Promise<TotvsApiResponse> {
-    const payload = { ...dadosUsuarioSistema, GPERMIS: gpermisAtualizado }
+    const payload = {
+      ...dadosUsuarioSistema,
+      GPERMIS: gpermisAtualizado,
+    }
+    console.log(
+      '🚀 ~ TotvsService ~ atualizarPerfisUsuario ~ payload:',
+      JSON.stringify(payload, null, 2),
+    )
 
     try {
       const response = await axios({
         method: 'put',
         url: `${totvsApiConstants.urlAPI}/rmsrestdataserver/rest/GlbUsuarioData/${cdUsuario}`,
         headers: {
-          CODFILIAL: totvsApiConstants.codigoFilial,
-          CODSISTEMA: codSistema,
           Authorization: totvsApiConstants.authorization,
+          CODSISTEMA: codSistema,
         },
         data: payload,
       })

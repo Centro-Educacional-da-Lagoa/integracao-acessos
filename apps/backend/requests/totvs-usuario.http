@@ -1,6 +1,52 @@
 ### Buscar usuário TOTVS pelo código (RA do aluno)
 ### Substitua o código no final da URL pelo RA desejado
-GET http://localhost:3000/totvs/usuario/2026100999
+GET http://201.148.210.189:8052/rmsrestdataserver/rest/GlbUsuarioData/75311568062
+Authorization: Basic UG9ydGFsTWF0cmljdWxhSW50Oms4Szl5cnBINFpRVXZzVg==
+CODSISTEMA: S
+Content-Type: application/json
+
+###
+PATCH http://201.148.210.189:8052/rmsrestdataserver/rest/GlbUsuarioData/75311568062
+Authorization: Basic UG9ydGFsTWF0cmljdWxhSW50Oms4Szl5cnBINFpRVXZzVg==
+CODSISTEMA: S
+Content-Type: application/json
+
+{ 
+    "GPERMIS": [
+      {
+        "id": "1$_$S$_$75311568062",
+        "parent_id": "75311568062",
+        "CODCOLIGADA": 1,
+        "CODSISTEMA": "S",
+        "CODUSUARIO": "75311568062",
+        "SUPERVISOR": 0,
+        "CONTROLE": 25752,
+        "CRIARELAT": 0,
+        "RECCREATEDBY": "PortalMatriculaInt",
+        "RECCREATEDON": "2026-03-20T15:29:17-03:00",
+        "RECMODIFIEDBY": "PortalMatriculaInt",
+        "RECMODIFIEDON": "2026-03-26T08:57:45-03:00",
+        "GUSRPERFIL": [
+          {
+            "id": "1$_$75311568062$_$S$_$Coordenação",
+            "parent_id": "1$_$S$_$75311568062",
+            "CODCOLIGADA": 1,
+            "CODUSUARIO": "75311568062",
+            "CODSISTEMA": "S",
+            "CODPERFIL": "Coordenação",
+            "INDICE": 0,
+            "CONTROLE": -23095,
+            "RECCREATEDBY": "19799694779",
+            "RECCREATEDON": "2026-03-20T15:32:16-03:00",
+            "RECMODIFIEDBY": "PortalMatriculaInt",
+            "RECMODIFIEDON": "2026-03-26T08:57:45-03:00",
+            "STATUS": 1,
+            "IDPERFIL": "Coordenação CEL"
+          }
+        ]
+      }
+    ]
+  }
 
 ###
 

@@ -15,6 +15,7 @@ export const AlunoCancelamentoTotvsSchema = z.object({
   IN_Usuario_Ativo: z.number().nullable(),
   IN_Existe_Matricula_Regular: z.number().int().min(0).max(1),
   IN_Inativo_Regular: z.number().int().min(0).max(1),
+  IN_Existe_Matricula_Extra: z.number().int().min(0).max(1),
   IN_Inativo_Extra: z.number().int().min(0).max(1),
   IN_Funcionario: z.number().int().min(0).max(1),
   IN_Responsavel: z.number().int().min(0).max(1),

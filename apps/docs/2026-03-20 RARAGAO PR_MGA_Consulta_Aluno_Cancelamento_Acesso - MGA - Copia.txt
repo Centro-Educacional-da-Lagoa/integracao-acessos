@@ -1,0 +1,610 @@
+USE [CORPORE_ERP_MANUTENCAO]
+GO
+
+--EXEC	[dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso] '2026', 1
+
+CREATE OR ALTER PROCEDURE [dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso]
+	( @prm_cd_periodo_letivo	varchar(20)
+	, @prm_cd_coligada			smallint
+	)
+AS
+BEGIN
+
+	/*
+
+	drop table #tmp_aluno_cancelado
+*/
+--declare @prm_cd_periodo_letivo	varchar(20) = '2026'
+--declare @prm_cd_coligada			smallint     = 1
+
+declare	@vr_cd_periodo_letivo_anterior	varchar(20)
+
+select	@vr_cd_periodo_letivo_anterior = cast(cast(@prm_cd_periodo_letivo as int) - 1 as varchar(20))
+
+
+-- Alunos no período letivo com somente matrículas canceladas ou falecido.
+
+select	 mtpl.codcoligada						as CD_Coligada
+		, mtpl.idperlet							as ID_Perlet
+		, prlt.codperlet						as CD_Periodo_Letivo
+		, mtpl.codfilial						as CD_Filial
+		, 'REGULAR'								as NM_Tipo_Matricula
+		, mtpl.ra								as CD_Registro_Academico
+		, pss.cpf								as CD_CPF
+		, upper(pss.nome)						as NM_Aluno
+		, pss.codigo							as CD_Pessoa
+		, pss.email								as TX_Email_Pessoa
+		, pss.codusuario						as CD_Usuario
+		, isnull(usr.status, 0)					as IN_Usuario_Ativo
+		, usr.email								as TX_Email_Usuario
+		, convert(varchar(10), pss.dtnascimento, 103)	as DT_Nascimento
+		, 1										as IN_Existe_Matricula_Regular
+		, 1										as IN_Inativo_Regular
+		, 0										as IN_Existe_Matricula_Extra
+		, 0										as IN_Inativo_Extra
+into	#tmp_aluno_cancelado
+from	dbo.smatricpl							as mtpl	with (nolock)
+inner	join dbo.spletivo						as prlt	with (nolock)
+  on	mtpl.codcoligada = prlt.codcoligada
+  and	mtpl.idperlet = prlt.idperlet
+inner	join dbo.shabilitacaofilial				as hbfl	with (nolock)
+  on	mtpl.codcoligada = hbfl.codcoligada
+  and	mtpl.idhabilitacaofilial = hbfl.idhabilitacaofilial
+inner	join dbo.shabilitacao					as hblt	with (nolock)
+  on	hbfl.codcoligada = hblt.codcoligada
+  and	hbfl.codcurso = hblt.codcurso
+  and	hbfl.codhabilitacao = hblt.codhabilitacao
+inner	join dbo.saluno							as aln		with (nolock)
+  on	mtpl.codcoligada = aln.codcoligada
+  and	mtpl.ra = aln.ra
+inner	join dbo.ppessoa						as pss		with (nolock)
+  on	aln.codpessoa = pss.codigo
+inner	join dbo.sstatus						as stt		with (nolock)
+  on	mtpl.codcoligada = stt.codcoligada
+  and	mtpl.codstatus = stt.codstatus
+left	join dbo.gusuario						as usr		with (nolock)
+  on	pss.codusuario = usr.codusuario
+where	hblt.complemento in ( 'EI', 'EF1', 'EF2', 'EM' )
+  and	mtpl.codcoligada = @prm_cd_coligada
+  and	prlt.codperlet = @prm_cd_periodo_letivo
+group	by mtpl.codcoligada
+		, mtpl.idperlet
+		, prlt.codperlet
+		, mtpl.codfilial
+		, mtpl.ra
+		, pss.cpf
+		, pss.nome
+		, pss.codigo
+		, pss.email
+		, pss.codusuario
+		, usr.status
+		, usr.email
+		, pss.dtnascimento
+having	count(*)
+	 =	sum(case when stt.descricao in ( 'Cancelado', 'Falecido', 'Pré-Matrícula Nula (Cancelado)' ) then 1 else 0 end)
+
+-- Alunos que finalizaram o último ano do EM no período letivo anterior.
+
+insert	into #tmp_aluno_cancelado
+		( CD_Coligada
+		, ID_Perlet
+		, CD_Periodo_Letivo
+		, CD_Filial
+		, NM_Tipo_Matricula
+		, CD_Registro_Academico
+		, CD_CPF
+		, NM_Aluno
+		, CD_Pessoa
+		, TX_Email_Pessoa
+		, CD_Usuario
+		, IN_Usuario_Ativo
+		, TX_Email_Usuario
+		, DT_Nascimento
+		, IN_Existe_Matricula_Regular
+		, IN_Inativo_Regular
+		, IN_Existe_Matricula_Extra
+		, IN_Inativo_Extra
+		)
+select	 mtpl.codcoligada						as CD_Coligada
+		, mtpl.idperlet							as ID_Perlet
+		, prlt.codperlet						as CD_Periodo_Letivo
+		, mtpl.codfilial						as CD_Filial
+		, 'REGULAR'								as NM_Tipo_Matricula
+		, mtpl.ra								as CD_Registro_Academico
+		, pss.cpf								as CD_CPF
+		, upper(pss.nome)						as NM_Aluno
+		, pss.codigo							as CD_Pessoa
+		, pss.email								as TX_Email_Pessoa
+		, pss.codusuario						as CD_Usuario
+		, isnull(usr.status, 0)					as IN_Usuario_Ativo
+		, usr.email								as TX_Email_Usuario
+		, convert(varchar(10), pss.dtnascimento, 103)	as DT_Nascimento
+		, 1										as IN_Existe_Matricula_Regular
+		, 1										as IN_Inativo_Regular
+		, 0										as IN_Existe_Matricula_Extra
+		, 0										as IN_Inativo_Extra
+from	dbo.smatricpl							as mtpl	with (nolock)
+inner	join dbo.spletivo						as prlt	with (nolock)
+  on	mtpl.codcoligada = prlt.codcoligada
+  and	mtpl.idperlet = prlt.idperlet
+inner	join dbo.shabilitacaofilial				as hbfl	with (nolock)
+  on	mtpl.codcoligada = hbfl.codcoligada
+  and	mtpl.idhabilitacaofilial = hbfl.idhabilitacaofilial
+inner	join dbo.shabilitacao					as hblt	with (nolock)
+  on	hbfl.codcoligada = hblt.codcoligada
+  and	hbfl.codcurso = hblt.codcurso
+  and	hbfl.codhabilitacao = hblt.codhabilitacao
+inner	join dbo.saluno							as aln		with (nolock)
+  on	mtpl.codcoligada = aln.codcoligada
+  and	mtpl.ra = aln.ra
+inner	join dbo.ppessoa						as pss		with (nolock)
+  on	aln.codpessoa = pss.codigo
+inner	join dbo.sstatus						as stt		with (nolock)
+  on	mtpl.codcoligada = stt.codcoligada
+  and	mtpl.codstatus = stt.codstatus
+left	join dbo.gusuario						as usr		with (nolock)
+  on	pss.codusuario = usr.codusuario
+where	mtpl.codcoligada = @prm_cd_coligada
+  and	prlt.codperlet = @vr_cd_periodo_letivo_anterior
+  and	hblt.complemento = 'EM'
+  and	hblt.codhabilitacao = '3S2'
+  and	stt.descricao = 'Ativo'
+  and	not exists
+		(
+			select	1
+			from	#tmp_aluno_cancelado			as tmp
+			where	tmp.CD_Registro_Academico = mtpl.ra
+			  and	tmp.CD_Coligada = mtpl.codcoligada
+		)
+
+-- Alunos que possuem somente matrícula no Curso Extra no período letivo anterior,
+-- e que não continuaram para o período letivo atual.
+
+insert into #tmp_aluno_cancelado
+select	mtpl.codcoligada
+		, mtpl.idperlet
+		, prlt.codperlet
+		, mtpl.codfilial
+		, 'EXTRA'
+		, mtpl.ra
+		, pss.cpf
+		, upper(pss.nome)
+		, pss.codigo
+		, pss.email
+		, pss.codusuario
+		, isnull(usr.status,0)
+		, usr.email
+		, convert(varchar(10), pss.dtnascimento, 103)
+		, 0 as IN_Existe_Matricula_Regular
+		, 0 as IN_Inativo_Regular
+		, 0 as IN_Existe_Matricula_Extra
+		, 0 as IN_Inativo_Extra
+from	smatricpl				as mtpl (nolock)
+inner	join spletivo			as prlt (nolock)
+  on	mtpl.codcoligada = prlt.codcoligada
+  and	mtpl.idperlet = prlt.idperlet
+inner	join shabilitacaofilial			as hbfl (nolock)
+  on	mtpl.codcoligada = hbfl.codcoligada
+  and	mtpl.idhabilitacaofilial = hbfl.idhabilitacaofilial
+inner	join shabilitacao			as hblt (nolock)
+  on	hbfl.codcoligada = hblt.codcoligada
+  and	hbfl.codcurso = hblt.codcurso
+  and	hbfl.codhabilitacao = hblt.codhabilitacao
+inner	join saluno				as aln (nolock)
+  on	mtpl.codcoligada = aln.codcoligada
+  and	mtpl.ra = aln.ra
+inner	join ppessoa			as pss (nolock)
+  on	aln.codpessoa = pss.codigo
+inner	join sstatus			as stt (nolock)
+  on	mtpl.codcoligada = stt.codcoligada
+  and	mtpl.codstatus = stt.codstatus
+left	join gusuario			as usr (nolock)
+  on	pss.codusuario = usr.codusuario
+where	(
+			( @prm_cd_coligada <> 5 and aln.codcoligada = @prm_cd_coligada )
+			or
+			( @prm_cd_coligada = 5 and aln.codcoligada = 6 )
+		)
+  and	prlt.codperlet = @vr_cd_periodo_letivo_anterior
+  and	hblt.complemento = 'CEX'
+  and	stt.descricao not in ('Cancelado', 'Falecido')
+  and	not exists 
+		(
+			select 1
+			from smatricpl				as mtpl2 (nolock)
+			inner	join spletivo			as prlt2 (nolock)
+			  on	mtpl2.codcoligada = prlt2.codcoligada
+			  and	mtpl2.idperlet = prlt2.idperlet
+			inner	join shabilitacaofilial			as hbfl2 (nolock)
+			  on	mtpl2.codcoligada = hbfl.codcoligada
+			  and	mtpl2.idhabilitacaofilial = hbfl.idhabilitacaofilial
+			inner	join shabilitacao			as hblt2 (nolock)
+			  on	hbfl.codcoligada = hblt.codcoligada
+			  and	hbfl.codcurso = hblt.codcurso
+			  and	hbfl.codhabilitacao = hblt.codhabilitacao
+			inner	join dbo.saluno			as aln2 (nolock)
+			  on	pss.codigo = aln2.codpessoa
+			inner	join ppessoa			as pss2 (nolock)
+			  on	aln.codpessoa = pss.codigo
+			inner	join sstatus			as stt2 (nolock)
+			  on	mtpl2.codcoligada = stt.codcoligada
+			  and	mtpl2.codstatus = stt.codstatus
+			where	mtpl2.codcoligada = @prm_cd_coligada
+			  and	( 
+						( @prm_cd_coligada <> 5 and mtpl.ra = mtpl2.ra )
+						or
+						( @prm_cd_coligada = 5 and pss.codigo = aln2.codpessoa )
+					)
+			  and	(prlt2.codperlet = cast(cast(@prm_cd_periodo_letivo as int) - 1 as varchar) or prlt2.codperlet = @prm_cd_periodo_letivo)
+			  and	hblt2.complemento in ('EI','EF1','EF2','EM')
+		)
+  and	not exists 
+		(
+			select 1
+			from smatricpl				as mtpl2 (nolock)
+			inner	join spletivo			as prlt2 (nolock)
+			  on	mtpl2.codcoligada = prlt2.codcoligada
+			  and	mtpl2.idperlet = prlt2.idperlet
+			inner	join shabilitacaofilial			as hbfl2 (nolock)
+			  on	mtpl2.codcoligada = hbfl.codcoligada
+			  and	mtpl2.idhabilitacaofilial = hbfl.idhabilitacaofilial
+			inner	join shabilitacao			as hblt2 (nolock)
+			  on	hbfl.codcoligada = hblt.codcoligada
+			  and	hbfl.codcurso = hblt.codcurso
+			  and	hbfl.codhabilitacao = hblt.codhabilitacao
+			inner	join dbo.saluno			as aln2 (nolock)
+			  on	pss.codigo = aln2.codpessoa
+			inner	join ppessoa			as pss2 (nolock)
+			  on	aln.codpessoa = pss.codigo
+			inner	join sstatus			as stt2 (nolock)
+			  on	mtpl2.codcoligada = stt.codcoligada
+			  and	mtpl2.codstatus = stt.codstatus
+			where	mtpl.codcoligada = mtpl2.codcoligada
+			  and	mtpl.ra = mtpl2.ra
+			  and	prlt2.codperlet = @prm_cd_periodo_letivo
+			  and	hblt2.complemento in ('CEX')
+		)
+  and	not exists 
+		(
+			select 1
+			from	#tmp_aluno_cancelado tmp
+			where	tmp.CD_Registro_Academico = aln.ra
+			  and	tmp.cd_coligada = mtpl.codcoligada
+		)
+
+-- Alunos que estão cancelado/falecido no curso extra dentro do perído letivo atual, e não possuem matrícula no regular
+
+insert into #tmp_aluno_cancelado
+select	mtpl.codcoligada
+		, mtpl.idperlet
+		, prlt.codperlet
+		, mtpl.codfilial
+		, 'EXTRA'
+		, mtpl.ra
+		, pss.cpf
+		, upper(pss.nome)
+		, pss.codigo
+		, pss.email
+		, pss.codusuario
+		, isnull(usr.status,0)
+		, usr.email
+		, convert(varchar(10), pss.dtnascimento, 103)
+		, 0 as IN_Existe_Matricula_Regular
+		, 0 as IN_Inativo_Regular
+		, 1 as IN_Existe_Matricula_Extra
+		, 1 as IN_Inativo_Extra
+from	smatricpl				as mtpl (nolock)
+inner	join spletivo			as prlt (nolock)
+  on	mtpl.codcoligada = prlt.codcoligada
+  and	mtpl.idperlet = prlt.idperlet
+inner	join shabilitacaofilial			as hbfl (nolock)
+  on	mtpl.codcoligada = hbfl.codcoligada
+  and	mtpl.idhabilitacaofilial = hbfl.idhabilitacaofilial
+inner	join shabilitacao			as hblt (nolock)
+  on	hbfl.codcoligada = hblt.codcoligada
+  and	hbfl.codcurso = hblt.codcurso
+  and	hbfl.codhabilitacao = hblt.codhabilitacao
+inner	join saluno				as aln (nolock)
+  on	mtpl.codcoligada = aln.codcoligada
+  and	mtpl.ra = aln.ra
+inner	join ppessoa			as pss (nolock)
+  on	aln.codpessoa = pss.codigo
+inner	join sstatus			as stt (nolock)
+  on	mtpl.codcoligada = stt.codcoligada
+  and	mtpl.codstatus = stt.codstatus
+left	join gusuario			as usr (nolock)
+  on	pss.codusuario = usr.codusuario
+where	(
+			( @prm_cd_coligada <> 5 and mtpl.codcoligada = @prm_cd_coligada )
+			or
+			( @prm_cd_coligada = 5 and mtpl.codcoligada = 6 )
+		)
+  and	prlt.codperlet = @prm_cd_periodo_letivo
+  and	hblt.complemento = 'CEX'
+  and	stt.descricao not in ('Cancelado', 'Falecido')
+  and	not exists 
+		(
+			select 1
+			from smatricpl				as mtpl2 (nolock)
+			inner	join spletivo			as prlt2 (nolock)
+			  on	mtpl2.codcoligada = prlt2.codcoligada
+			  and	mtpl2.idperlet = prlt2.idperlet
+			inner	join shabilitacaofilial			as hbfl2 (nolock)
+			  on	mtpl2.codcoligada = hbfl.codcoligada
+			  and	mtpl2.idhabilitacaofilial = hbfl.idhabilitacaofilial
+			inner	join shabilitacao			as hblt2 (nolock)
+			  on	hbfl.codcoligada = hblt.codcoligada
+			  and	hbfl.codcurso = hblt.codcurso
+			  and	hbfl.codhabilitacao = hblt.codhabilitacao
+			inner	join dbo.saluno			as aln2 (nolock)
+			  on	mtpl2.codcoligada = aln2.codcoligada
+			  and	mtpl2.ra = aln2.ra
+			inner	join ppessoa			as pss2 (nolock)
+			  on	aln2.codpessoa = pss2.codigo
+			inner	join sstatus			as stt2 (nolock)
+			  on	mtpl2.codcoligada = stt2.codcoligada
+			  and	mtpl2.codstatus = stt2.codstatus
+			where	mtpl2.codcoligada = @prm_cd_coligada
+			  and	( 
+						( @prm_cd_coligada <> 5 and mtpl.ra = mtpl2.ra )
+						or
+						( @prm_cd_coligada = 5 and pss.codigo = pss2.codigo )
+					)
+			  and	prlt2.codperlet = @prm_cd_periodo_letivo
+			  and	hblt2.complemento in ('EI','EF1','EF2','EM')
+		)
+  and	not exists 
+		(
+			select 1
+			from	#tmp_aluno_cancelado tmp
+			where	tmp.CD_Registro_Academico = aln.ra
+			  and	tmp.cd_coligada = mtpl.codcoligada
+		)
+
+create table #tmp_cex
+(
+	CD_Registro_Academico			varchar(50) collate database_default		null
+	, CD_Pessoa						int											null
+	, CD_Periodo_Letivo				varchar(20) collate database_default		not null
+	, QT_Matricula_Total_Extra		int											not null
+	, QT_Matricula_Inativo_Extra	int											not null
+)
+
+
+if @prm_cd_coligada <> 5
+begin
+
+	insert	into #tmp_cex
+		( CD_Registro_Academico
+		, CD_Pessoa
+		, CD_Periodo_Letivo
+		, QT_Matricula_Total_Extra
+		, QT_Matricula_Inativo_Extra
+		)
+	select	 mtpl.ra								as CD_Registro_Academico
+			, null									as CD_Pessoa
+			, prlt.codperlet						as CD_Periodo_Letivo
+			, count(*)								as QT_Matricula_Total_Extra
+			, sum(
+					case
+						when stt.descricao in ( 'Cancelado', 'Falecido' )
+						then 1
+						else 0
+					end
+				  )									as QT_Matricula_Inativo_Extra
+	from	dbo.smatricpl							as mtpl	with (nolock)
+	inner	join dbo.saluno							as aln		with (nolock)
+	  on	mtpl.codcoligada = aln.codcoligada
+	  and	mtpl.ra = aln.ra
+	inner	join dbo.spletivo						as prlt	with (nolock)
+	  on	mtpl.codcoligada = prlt.codcoligada
+	  and	mtpl.idperlet = prlt.idperlet
+	inner	join dbo.shabilitacaofilial				as hbfl	with (nolock)
+	  on	mtpl.codcoligada = hbfl.codcoligada
+	  and	mtpl.idhabilitacaofilial = hbfl.idhabilitacaofilial
+	inner	join dbo.shabilitacao					as hblt	with (nolock)
+	  on	hbfl.codcoligada = hblt.codcoligada
+	  and	hbfl.codcurso = hblt.codcurso
+	  and	hbfl.codhabilitacao = hblt.codhabilitacao
+	inner	join dbo.sstatus						as stt		with (nolock)
+	  on	mtpl.codcoligada = stt.codcoligada
+	  and	mtpl.codstatus = stt.codstatus
+	where	prlt.codperlet in ( @prm_cd_periodo_letivo, @vr_cd_periodo_letivo_anterior )
+	  and	hblt.complemento = 'CEX'
+	  and	mtpl.codcoligada = @prm_cd_coligada
+	group	by mtpl.ra
+			, prlt.codperlet
+
+	create clustered index IX_tmp_cex
+		on #tmp_cex ( CD_Registro_Academico, CD_Periodo_Letivo )
+
+	update	tmp
+	   set	 tmp.IN_Existe_Matricula_Extra =
+				case
+					when isnull(cex.QT_Matricula_Total_Extra, 0) > 0 then 1
+					else 0
+				end
+			, tmp.IN_Inativo_Extra =
+				case
+					when isnull(cex.QT_Matricula_Total_Extra, 0) > 0
+					 and isnull(cex.QT_Matricula_Inativo_Extra, 0) = isnull(cex.QT_Matricula_Total_Extra, 0)
+					then 1
+					else 0
+				end
+	from	#tmp_aluno_cancelado					as tmp
+	left	join #tmp_cex							as cex
+	  on	tmp.CD_Registro_Academico = cex.CD_Registro_Academico
+	  and	tmp.CD_Periodo_Letivo = cex.CD_Periodo_Letivo
+	  and	tmp.nm_tipo_matricula = 'REGULAR'
+
+end
+else
+begin
+
+	insert	into #tmp_cex
+		( CD_Registro_Academico
+		, CD_Pessoa
+		, CD_Periodo_Letivo
+		, QT_Matricula_Total_Extra
+		, QT_Matricula_Inativo_Extra
+		)
+	select	 null									as CD_Registro_Academico
+			, aln.codpessoa							as CD_Pessoa
+			, prlt.codperlet						as CD_Periodo_Letivo
+			, count(*)								as QT_Matricula_Total_Extra
+			, sum(
+					case
+						when stt.descricao in ( 'Cancelado', 'Falecido' )
+						then 1
+						else 0
+					end
+				  )									as QT_Matricula_Inativo_Extra
+	from	dbo.smatricpl							as mtpl	with (nolock)
+	inner	join dbo.saluno							as aln		with (nolock)
+	  on	mtpl.codcoligada = aln.codcoligada
+	  and	mtpl.ra = aln.ra
+	inner	join dbo.spletivo						as prlt	with (nolock)
+	  on	mtpl.codcoligada = prlt.codcoligada
+	  and	mtpl.idperlet = prlt.idperlet
+	inner	join dbo.shabilitacaofilial				as hbfl	with (nolock)
+	  on	mtpl.codcoligada = hbfl.codcoligada
+	  and	mtpl.idhabilitacaofilial = hbfl.idhabilitacaofilial
+	inner	join dbo.shabilitacao					as hblt	with (nolock)
+	  on	hbfl.codcoligada = hblt.codcoligada
+	  and	hbfl.codcurso = hblt.codcurso
+	  and	hbfl.codhabilitacao = hblt.codhabilitacao
+	inner	join dbo.sstatus						as stt		with (nolock)
+	  on	mtpl.codcoligada = stt.codcoligada
+	  and	mtpl.codstatus = stt.codstatus
+	where	prlt.codperlet in ( @prm_cd_periodo_letivo, @vr_cd_periodo_letivo_anterior )
+	  and	hblt.complemento = 'CEX'
+	  and	mtpl.codcoligada = 6
+	group	by aln.codpessoa
+			, prlt.codperlet
+
+	create clustered index IX_tmp_cex
+		on #tmp_cex ( CD_Pessoa, CD_Periodo_Letivo )
+
+	update	tmp
+	   set	 tmp.IN_Existe_Matricula_Extra =
+				case
+					when isnull(cex.QT_Matricula_Total_Extra, 0) > 0 then 1
+					else 0
+				end
+			, tmp.IN_Inativo_Extra =
+				case
+					when isnull(cex.QT_Matricula_Total_Extra, 0) > 0
+					 and isnull(cex.QT_Matricula_Inativo_Extra, 0) = isnull(cex.QT_Matricula_Total_Extra, 0)
+					then 1
+					else 0
+				end
+	from	#tmp_aluno_cancelado					as tmp
+	left	join #tmp_cex							as cex
+	  on	tmp.CD_Pessoa = cex.CD_Pessoa
+	  and	tmp.CD_Periodo_Letivo = cex.CD_Periodo_Letivo
+	  and	tmp.nm_tipo_matricula = 'REGULAR'
+
+end
+
+drop table #tmp_cex
+
+
+
+	select	tmp.*
+			, case
+					when func.codpessoa is not null then 1
+					else 0
+			  end				as IN_Funcionario
+			, case
+					when exists
+							(
+								select 1
+								from	dbo.saluno			as alno (nolock)
+								inner	join dbo.smatricpl			as mtpl (nolock)
+								  on	alno.codcoligada = mtpl.codcoligada
+								  and	alno.ra = mtpl.ra
+								inner	join dbo.sstatus				as stt (nolock)
+								  on	mtpl.codcoligada = stt.codcoligada
+								  and	mtpl.codstatus = stt.codstatus
+								inner	join dbo.spletivo				as prlt (nolock)
+								  on	mtpl.codcoligada = prlt.codcoligada
+								  and	mtpl.idperlet = prlt.idperlet
+								inner	join dbo.shabilitacaofilial				as hbfl	(nolock)
+								  on	mtpl.codcoligada = hbfl.codcoligada
+								  and	mtpl.idhabilitacaofilial = hbfl.idhabilitacaofilial
+								inner	join dbo.shabilitacao					as hblt	(nolock)
+								  on	hbfl.codcoligada = hblt.codcoligada
+								  and	hbfl.codcurso = hblt.codcurso
+								  and	hbfl.codhabilitacao = hblt.codhabilitacao
+								where	alno.codcfo = fcfo.codcfo
+								  and	( alno.ra <> tmp.cd_registro_academico and alno.codcoligada <> tmp.cd_coligada )
+								  and	stt.descricao not in ('Cancelado', 'Falecido')
+								  and	prlt.codperlet = @prm_cd_periodo_letivo
+							)
+						 or exists
+							(
+								select 1
+								from	dbo.saluno			as alno (nolock)
+								inner	join dbo.smatricpl			as mtpl (nolock)
+								  on	alno.codcoligada = mtpl.codcoligada
+								  and	alno.ra = mtpl.ra
+								inner	join dbo.sstatus				as stt (nolock)
+								  on	mtpl.codcoligada = stt.codcoligada
+								  and	mtpl.codstatus = stt.codstatus
+								inner	join dbo.spletivo				as prlt (nolock)
+								  on	mtpl.codcoligada = prlt.codcoligada
+								  and	mtpl.idperlet = prlt.idperlet
+								inner	join dbo.shabilitacaofilial				as hbfl	(nolock)
+								  on	mtpl.codcoligada = hbfl.codcoligada
+								  and	mtpl.idhabilitacaofilial = hbfl.idhabilitacaofilial
+								inner	join dbo.shabilitacao					as hblt	(nolock)
+								  on	hbfl.codcoligada = hblt.codcoligada
+								  and	hbfl.codcurso = hblt.codcurso
+								  and	hbfl.codhabilitacao = hblt.codhabilitacao
+								where	alno.codpessoaraca = tmp.cd_pessoa
+								  and	( alno.ra <> tmp.cd_registro_academico and alno.codcoligada <> tmp.cd_coligada )
+								  and	stt.descricao not in ('Cancelado', 'Falecido')
+								  and	prlt.codperlet = @prm_cd_periodo_letivo
+							)
+						 or exists
+							(
+								select 1
+								from	dbo.vfiliacao			as alfi (nolock)
+								inner	join dbo.saluno			as alno (nolock)
+								  on	alfi.codpessoafilho = alno.codpessoa
+								inner	join dbo.smatricpl			as mtpl (nolock)
+								  on	alno.codcoligada = mtpl.codcoligada
+								  and	alno.ra = mtpl.ra
+								inner	join dbo.sstatus				as stt (nolock)
+								  on	mtpl.codcoligada = stt.codcoligada
+								  and	mtpl.codstatus = stt.codstatus
+								inner	join dbo.spletivo				as prlt (nolock)
+								  on	mtpl.codcoligada = prlt.codcoligada
+								  and	mtpl.idperlet = prlt.idperlet
+								inner	join dbo.shabilitacaofilial				as hbfl	(nolock)
+								  on	mtpl.codcoligada = hbfl.codcoligada
+								  and	mtpl.idhabilitacaofilial = hbfl.idhabilitacaofilial
+								inner	join dbo.shabilitacao					as hblt	(nolock)
+								  on	hbfl.codcoligada = hblt.codcoligada
+								  and	hbfl.codcurso = hblt.codcurso
+								  and	hbfl.codhabilitacao = hblt.codhabilitacao
+								where	alfi.codpessoafiliacao = tmp.cd_pessoa
+								  and	( alno.ra <> tmp.cd_registro_academico and alno.codcoligada <> tmp.cd_coligada )
+								  and	stt.descricao not in ('Cancelado', 'Falecido')
+								  and	prlt.codperlet = @prm_cd_periodo_letivo
+							) then 1
+							  else 0 
+			  end				as IN_Responsavel
+	from		#tmp_aluno_cancelado		as tmp (nolock)
+	left	join dbo.pfunc				as func (nolock)
+	  on	tmp.cd_pessoa = func.codpessoa
+	  and	func.codsituacao <> 'D'
+	left	join dbo.fcfo			as fcfo (nolock)
+	  on	replace(replace(fcfo.cgccfo, '.', ''), '-', '') = tmp.CD_CPF
+
+  --select * from 	#tmp_aluno_cancelado
+
+
+END;
+
+--EXEC	[dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso] '2026', 5
