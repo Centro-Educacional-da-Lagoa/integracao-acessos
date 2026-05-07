@@ -6,6 +6,7 @@ GO
 CREATE OR ALTER PROCEDURE [dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso]
 	( @prm_cd_periodo_letivo	varchar(20)
 	, @prm_cd_coligada			smallint
+	, @prm_cd_registro_academico varchar(20) = null
 	)
 AS
 BEGIN
@@ -25,9 +26,9 @@ select	@vr_cd_periodo_letivo_anterior = cast(cast(@prm_cd_periodo_letivo as int)
 -- Alunos no período letivo com somente matrículas canceladas ou falecido.
 
 select	 mtpl.codcoligada						as CD_Coligada
-		, mtpl.idperlet							as ID_Perlet
-		, prlt.codperlet						as CD_Periodo_Letivo
 		, mtpl.codfilial						as CD_Filial
+		, mtpl.idperlet							as ID_Periodo_Letivo
+		, prlt.codperlet						as CD_Periodo_Letivo
 		, 'REGULAR'								as NM_Tipo_Matricula
 		, mtpl.ra								as CD_Registro_Academico
 		, pss.cpf								as CD_CPF
@@ -87,9 +88,9 @@ having	count(*)
 
 insert	into #tmp_aluno_cancelado
 		( CD_Coligada
-		, ID_Perlet
-		, CD_Periodo_Letivo
 		, CD_Filial
+		, ID_Periodo_Letivo
+		, CD_Periodo_Letivo
 		, NM_Tipo_Matricula
 		, CD_Registro_Academico
 		, CD_CPF
@@ -106,9 +107,9 @@ insert	into #tmp_aluno_cancelado
 		, IN_Inativo_Extra
 		)
 select	 mtpl.codcoligada						as CD_Coligada
-		, mtpl.idperlet							as ID_Perlet
-		, prlt.codperlet						as CD_Periodo_Letivo
 		, mtpl.codfilial						as CD_Filial
+		, mtpl.idperlet							as ID_Periodo_Letivo
+		, prlt.codperlet						as CD_Periodo_Letivo
 		, 'REGULAR'								as NM_Tipo_Matricula
 		, mtpl.ra								as CD_Registro_Academico
 		, pss.cpf								as CD_CPF
@@ -147,6 +148,7 @@ left	join dbo.gusuario						as usr		with (nolock)
 where	mtpl.codcoligada = @prm_cd_coligada
   and	prlt.codperlet = @vr_cd_periodo_letivo_anterior
   and	hblt.complemento = 'EM'
+  and	mtpl.codstatusres = 5
   and	hblt.codhabilitacao = '3S2'
   and	stt.descricao = 'Ativo'
   and	not exists
@@ -161,10 +163,29 @@ where	mtpl.codcoligada = @prm_cd_coligada
 -- e que não continuaram para o período letivo atual.
 
 insert into #tmp_aluno_cancelado
+		( CD_Coligada
+		, CD_Filial
+		, ID_Periodo_Letivo
+		, CD_Periodo_Letivo
+		, NM_Tipo_Matricula
+		, CD_Registro_Academico
+		, CD_CPF
+		, NM_Aluno
+		, CD_Pessoa
+		, TX_Email_Pessoa
+		, CD_Usuario
+		, IN_Usuario_Ativo
+		, TX_Email_Usuario
+		, DT_Nascimento
+		, IN_Existe_Matricula_Regular
+		, IN_Inativo_Regular
+		, IN_Existe_Matricula_Extra
+		, IN_Inativo_Extra
+		)
 select	mtpl.codcoligada
+		, mtpl.codfilial
 		, mtpl.idperlet
 		, prlt.codperlet
-		, mtpl.codfilial
 		, 'EXTRA'
 		, mtpl.ra
 		, pss.cpf
@@ -275,10 +296,29 @@ where	(
 -- Alunos que estão cancelado/falecido no curso extra dentro do perído letivo atual, e não possuem matrícula no regular
 
 insert into #tmp_aluno_cancelado
+		( CD_Coligada
+		, CD_Filial
+		, ID_Periodo_Letivo
+		, CD_Periodo_Letivo
+		, NM_Tipo_Matricula
+		, CD_Registro_Academico
+		, CD_CPF
+		, NM_Aluno
+		, CD_Pessoa
+		, TX_Email_Pessoa
+		, CD_Usuario
+		, IN_Usuario_Ativo
+		, TX_Email_Usuario
+		, DT_Nascimento
+		, IN_Existe_Matricula_Regular
+		, IN_Inativo_Regular
+		, IN_Existe_Matricula_Extra
+		, IN_Inativo_Extra
+		)
 select	mtpl.codcoligada
+		, mtpl.codfilial
 		, mtpl.idperlet
 		, prlt.codperlet
-		, mtpl.codfilial
 		, 'EXTRA'
 		, mtpl.ra
 		, pss.cpf
@@ -537,7 +577,11 @@ drop table #tmp_cex
 								  and	hbfl.codcurso = hblt.codcurso
 								  and	hbfl.codhabilitacao = hblt.codhabilitacao
 								where	alno.codcfo = fcfo.codcfo
-								  and	( alno.ra <> tmp.cd_registro_academico and alno.codcoligada <> tmp.cd_coligada )
+								  and	(
+											(alno.ra <> tmp.CD_Registro_Academico)
+											or
+											(alno.ra = tmp.CD_Registro_Academico and alno.codcoligada = tmp.CD_Coligada)
+										)
 								  and	stt.descricao not in ('Cancelado', 'Falecido')
 								  and	prlt.codperlet = @prm_cd_periodo_letivo
 							)
@@ -562,7 +606,11 @@ drop table #tmp_cex
 								  and	hbfl.codcurso = hblt.codcurso
 								  and	hbfl.codhabilitacao = hblt.codhabilitacao
 								where	alno.codpessoaraca = tmp.cd_pessoa
-								  and	( alno.ra <> tmp.cd_registro_academico and alno.codcoligada <> tmp.cd_coligada )
+								  and	(
+											(alno.ra <> tmp.CD_Registro_Academico)
+											or
+											(alno.ra = tmp.CD_Registro_Academico and alno.codcoligada = tmp.CD_Coligada)
+										)
 								  and	stt.descricao not in ('Cancelado', 'Falecido')
 								  and	prlt.codperlet = @prm_cd_periodo_letivo
 							)
@@ -589,7 +637,11 @@ drop table #tmp_cex
 								  and	hbfl.codcurso = hblt.codcurso
 								  and	hbfl.codhabilitacao = hblt.codhabilitacao
 								where	alfi.codpessoafiliacao = tmp.cd_pessoa
-								  and	( alno.ra <> tmp.cd_registro_academico and alno.codcoligada <> tmp.cd_coligada )
+								  and	(
+											(alno.ra <> tmp.CD_Registro_Academico)
+											or
+											(alno.ra = tmp.CD_Registro_Academico and alno.codcoligada = tmp.CD_Coligada)
+										)
 								  and	stt.descricao not in ('Cancelado', 'Falecido')
 								  and	prlt.codperlet = @prm_cd_periodo_letivo
 							) then 1
@@ -601,10 +653,11 @@ drop table #tmp_cex
 	  and	func.codsituacao <> 'D'
 	left	join dbo.fcfo			as fcfo (nolock)
 	  on	replace(replace(fcfo.cgccfo, '.', ''), '-', '') = tmp.CD_CPF
-
+	where	( @prm_cd_registro_academico is null or @prm_cd_registro_academico = tmp.cd_registro_academico)
+	--where	tmp.CD_Registro_Academico = '2026100999'
   --select * from 	#tmp_aluno_cancelado
 
 
 END;
 
---EXEC	[dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso] '2026', 5
+--EXEC	[dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso] '2026', 1

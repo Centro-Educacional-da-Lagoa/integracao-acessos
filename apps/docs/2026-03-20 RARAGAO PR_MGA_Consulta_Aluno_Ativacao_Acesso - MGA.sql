@@ -1,12 +1,13 @@
 USE [CORPORE_ERP_MANUTENCAO]
 GO
 
---EXEC [dbo].[PR_MGA_Consulta_Aluno_Ativacao_Acesso] '2026', 5
+--EXEC [dbo].[PR_MGA_Consulta_Aluno_Ativacao_Acesso] '2026', 1
 
 
 CREATE OR ALTER PROCEDURE [dbo].[PR_MGA_Consulta_Aluno_Ativacao_Acesso]
 	( @prm_cd_periodo_letivo	varchar(20)
 	, @prm_cd_coligada			smallint
+	, @prm_cd_registro_academico varchar(20) = null
 	)
 AS
 BEGIN
@@ -22,9 +23,9 @@ BEGIN
 	-- 1. Alunos Ativos no Ensino Regular
 	-- =========================================================================================
 	select	 mtpl.codcoligada						as CD_Coligada
-			, mtpl.idperlet							as ID_Perlet
-			, prlt.codperlet						as CD_Periodo_Letivo
 			, mtpl.codfilial						as CD_Filial
+			, mtpl.idperlet							as ID_Periodo_Letivo
+			, prlt.codperlet						as CD_Periodo_Letivo
 			, 'REGULAR'								as NM_Tipo_Matricula
 			, mtpl.ra								as CD_Registro_Academico
 			, pss.cpf								as CD_CPF
@@ -293,7 +294,11 @@ BEGIN
 								  and	hbfl.codcurso = hblt.codcurso
 								  and	hbfl.codhabilitacao = hblt.codhabilitacao
 								where	alno.codcfo = fcfo.codcfo
-								  and	( alno.ra <> tmp.CD_Registro_Academico and alno.codcoligada <> tmp.CD_Coligada )
+								  and	(
+											(alno.ra <> tmp.CD_Registro_Academico)
+											or
+											(alno.ra = tmp.CD_Registro_Academico and alno.codcoligada = tmp.CD_Coligada)
+										)
 								  and	stt.descricao not in ( 'Cancelado', 'Falecido' )
 								  and	prlt.codperlet = @prm_cd_periodo_letivo
 							)
@@ -318,7 +323,11 @@ BEGIN
 								  and	hbfl.codcurso = hblt.codcurso
 								  and	hbfl.codhabilitacao = hblt.codhabilitacao
 								where	alno.codpessoaraca = tmp.CD_Pessoa
-								  and	( alno.ra <> tmp.CD_Registro_Academico and alno.codcoligada <> tmp.CD_Coligada )
+								  and	(
+											(alno.ra <> tmp.CD_Registro_Academico)
+											or
+											(alno.ra = tmp.CD_Registro_Academico and alno.codcoligada = tmp.CD_Coligada)
+										)
 								  and	stt.descricao not in ( 'Cancelado', 'Falecido' )
 								  and	prlt.codperlet = @prm_cd_periodo_letivo
 							)
@@ -345,7 +354,11 @@ BEGIN
 								  and	hbfl.codcurso = hblt.codcurso
 								  and	hbfl.codhabilitacao = hblt.codhabilitacao
 								where	alfi.codpessoafiliacao = tmp.CD_Pessoa
-								  and	( alno.ra <> tmp.CD_Registro_Academico and alno.codcoligada <> tmp.CD_Coligada )
+								  and	(
+											(alno.ra <> tmp.CD_Registro_Academico)
+											or
+											(alno.ra = tmp.CD_Registro_Academico and alno.codcoligada = tmp.CD_Coligada)
+										)
 								  and	stt.descricao not in ( 'Cancelado', 'Falecido' )
 								  and	prlt.codperlet = @prm_cd_periodo_letivo
 							) then 1
@@ -357,5 +370,7 @@ BEGIN
 	  and	func.codsituacao <> 'D'
 	left	join dbo.fcfo							as fcfo	with (nolock)
 	  on	replace(replace(fcfo.cgccfo, '.', ''), '-', '') = tmp.CD_CPF
+	--where	( @prm_cd_registro_academico is null or @prm_cd_registro_academico = tmp.cd_registro_academico)
+	where	tmp.CD_Registro_Academico = '2026100999'
 
 END
