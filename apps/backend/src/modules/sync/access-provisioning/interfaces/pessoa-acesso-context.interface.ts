@@ -7,6 +7,9 @@
  * (ex: IN_Aluno=1 e IN_Funcionario=1). Os campos IN_* são independentes.
  */
 export interface PessoaAcessoContext {
+  /** Origem do fluxo de revogação para evitar mistura de regras entre entidades */
+  TP_Origem_Revogacao?: 'ALUNO' | 'RESPONSAVEL'
+
   /** Código da pessoa no TOTVS (PPESSOA.CODPESSOA) */
   CD_Pessoa: string
 
@@ -59,6 +62,18 @@ export interface PessoaAcessoContext {
 
   /** Código da filial */
   CD_Filial?: number | null
+
+  /** Lista de filiais para operações agregadas (ex.: responsável com múltiplas linhas) */
+  CD_Filiais?: number[]
+
+  /** Lista de combinações coligada+filial permitidas para operações agregadas */
+  CD_Alocacoes?: Array<{ CD_Coligada: number; CD_Filial: number }>
+
+  /** Coligada em que o responsável também está alocado como aluno */
+  CD_Coligada_Aluno?: number | null
+
+  /** Lista de filiais em que o responsável também está alocado como aluno */
+  CD_Filiais_Aluno?: number[]
 
   /** Domínio institucional configurado para a coligada */
   NM_Dominio_Email_Institucional: string

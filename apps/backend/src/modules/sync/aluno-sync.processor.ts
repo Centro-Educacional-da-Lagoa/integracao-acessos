@@ -355,6 +355,7 @@ export class AlunoSyncProcessor {
     )
 
     const ctx: PessoaAcessoContext = {
+      TP_Origem_Revogacao: 'ALUNO',
       CD_Pessoa: alunoCancelamento.CD_Pessoa,
       CD_Usuario: alunoCancelamento.CD_Usuario,
       CD_CPF: alunoCancelamento.CD_CPF,

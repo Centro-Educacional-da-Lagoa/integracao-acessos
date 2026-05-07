@@ -4,6 +4,9 @@ import { AlunoSyncService } from './aluno-sync.service'
 import { AlunoSyncCron } from './aluno-sync.cron'
 import { AlunoSyncController } from './aluno-sync.controller'
 import { AlunoSyncProcessor } from './aluno-sync.processor'
+import { ResponsavelSyncController } from './responsavel-sync.controller'
+import { ResponsavelSyncProcessor } from './responsavel-sync.processor'
+import { ResponsavelSyncService } from './responsavel-sync.service'
 import { TotvsModule } from '../integrations/totvs/totvs.module'
 import { GoogleModule } from '../integrations/google/google.module'
 import { PrismaService } from '../../core/prisma/prisma.service'
@@ -26,12 +29,17 @@ import { AccessProvisioningModule } from './access-provisioning/access-provision
     BullModule.registerQueue({
       name: 'aluno-sync',
     }),
+    BullModule.registerQueue({
+      name: 'responsavel-sync',
+    }),
   ],
-  controllers: [AlunoSyncController],
+  controllers: [AlunoSyncController, ResponsavelSyncController],
   providers: [
     AlunoSyncService,
     AlunoSyncCron,
     AlunoSyncProcessor,
+    ResponsavelSyncService,
+    ResponsavelSyncProcessor,
     PrismaService,
   ],
 })

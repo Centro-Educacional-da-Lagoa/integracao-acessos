@@ -36,5 +36,28 @@ export const PERFIS_ACESSO: PerfilAcessoEntry[] = [
     CD_Coligada: 5,
     TP_Entidade: TipoEntidade.ALUNO,
   },
-  // Adicionar perfis de FUNCIONARIO e RESPONSAVEL aqui quando as integrações forem implementadas
+  {
+    NM_Perfil: 'RespFinanc_CEL',
+    CD_Sistema: 'S',
+    CD_Coligada: 1,
+    TP_Entidade: TipoEntidade.RESPONSAVEL,
+  },
+  {
+    NM_Perfil: 'RespAcad_CEL',
+    CD_Sistema: 'S',
+    CD_Coligada: 1,
+    TP_Entidade: TipoEntidade.RESPONSAVEL,
+  },
+  {
+    NM_Perfil: 'RespAcad_LFB',
+    CD_Sistema: 'S',
+    CD_Coligada: 5,
+    TP_Entidade: TipoEntidade.RESPONSAVEL,
+  },
+  {
+    NM_Perfil: 'RespFinanc_LFB',
+    CD_Sistema: 'S',
+    CD_Coligada: 5,
+    TP_Entidade: TipoEntidade.RESPONSAVEL,
+  },
 ]

@@ -5,6 +5,7 @@ import { PrismaService } from '../../../core/prisma/prisma.service'
 import { FuncionarioTotvsDto } from './dto/funcionario-totvs.dto'
 import { AlunoTotvsDto } from './dto/aluno-totvs.dto'
 import { AlunoCancelamentoTotvsDto } from './dto/aluno-cancelamento-totvs.dto'
+import { ResponsavelCancelamentoTotvsDto } from './dto/responsavel-cancelamento-totvs.dto'
 import { getTotvsTableName } from 'src/utils/get-table-corpore'
 import { totvsApiConstants } from './constants/totvs-api.constants'
 
@@ -21,6 +22,14 @@ interface GarantirUsuarioFilialParams {
   cdFilial: number
   cdUsuario: string
   inFuncionario: number
+}
+
+export interface UsuarioFilialTotvsDto {
+  CODCOLIGADA: number
+  CODTIPOCURSO: number
+  CODFILIAL: number
+  CODUSUARIO: string
+  ACESSO: number | string | null
 }
 
 @Injectable()
@@ -165,10 +174,65 @@ export class TotvsService {
     )
   }
 
+  async fetchResponsaveisCancelamento(
+    CD_Periodo_Letivo: string,
+    CD_Pessoa: number | null = null,
+    CD_CPF: string | null = null,
+    CD_Registro_Academico: string | null = null,
+  ): Promise<ResponsavelCancelamentoTotvsDto[]> {
+    const periodoLetivoEscapado = CD_Periodo_Letivo.replace(/'/g, "''")
+    const cdPessoaSql = this.toSqlNumberOrNull(CD_Pessoa)
+    const cdCpfSql = this.toSqlStringOrNull(CD_CPF)
+    const cdRegistroAcademicoSql = this.toSqlStringOrNull(
+      CD_Registro_Academico,
+    )
+
+    this.logger.log(
+      `Buscando responsáveis para cancelamento — período ${CD_Periodo_Letivo}`,
+    )
+
+    const result = await this.prisma.$queryRawUnsafe<
+      ResponsavelCancelamentoTotvsDto[]
+    >(
+      `
+      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Responsavel_Cancelamento_Acesso] '${periodoLetivoEscapado}', ${cdPessoaSql}, ${cdCpfSql}, ${cdRegistroAcademicoSql}`,
+    )
+
+    this.logger.log(
+      `Encontrados ${result.length} linha(s) de responsável para cancelamento`,
+    )
+
+    return result
+  }
+
+  async fetchResponsavelCancelamento(
+    CD_Periodo_Letivo: string,
+    CD_Pessoa: number | null = null,
+    CD_CPF: string | null = null,
+    CD_Registro_Academico: string | null = null,
+  ): Promise<ResponsavelCancelamentoTotvsDto | null> {
+    const responsaveis = await this.fetchResponsaveisCancelamento(
+      CD_Periodo_Letivo,
+      CD_Pessoa,
+      CD_CPF,
+      CD_Registro_Academico,
+    )
+
+    return responsaveis[0] ?? null
+  }
+
   private toSqlStringOrNull(value: string | null): string {
     if (!value) return 'NULL'
 
     return `'${value.replace(/'/g, "''")}'`
+  }
+
+  private toSqlNumberOrNull(value: number | null): string {
+    if (value === null || value === undefined || Number.isNaN(value)) {
+      return 'NULL'
+    }
+
+    return `${Math.trunc(value)}`
   }
 
   private assertProcedureColigadaPermitida(CD_Coligada: number): void {
@@ -375,6 +439,38 @@ export class TotvsService {
     }
   }
 
+  async fetchUsuarioFiliaisAtivos(
+    cdUsuario: string,
+  ): Promise<UsuarioFilialTotvsDto[]> {
+    const cdUsuarioSql = this.toSqlStringOrNull(cdUsuario)
+    const codTipoCurso = Number(totvsApiConstants.codigoTipoCurso)
+
+    this.logger.log(
+      `[UsuarioFilial] Buscando acessos ativos do usuário ${cdUsuario}`,
+    )
+
+    const result = await this.prisma.$queryRawUnsafe<UsuarioFilialTotvsDto[]>(
+      `
+      SELECT	 CODCOLIGADA
+      		, CODTIPOCURSO
+      		, CODFILIAL
+      		, CODUSUARIO
+      		, ACESSO
+      FROM	${this.tableCorpore}.[dbo].[SUSUARIOFILIAL] WITH (NOLOCK)
+      WHERE	CODUSUARIO = ${cdUsuarioSql}
+        AND	CODTIPOCURSO = ${codTipoCurso}
+        AND	CODCOLIGADA IN (1, 5)
+       -- AND	ISNULL(ACESSO, 0) <> 0
+      `,
+    )
+
+    this.logger.log(
+      `[UsuarioFilial] ${result.length} acesso(s) ativo(s) encontrado(s) para ${cdUsuario}`,
+    )
+
+    return result
+  }
+
   async garantirUsuarioFilial(
     params: GarantirUsuarioFilialParams,
   ): Promise<TotvsApiResponse> {
@@ -499,17 +595,11 @@ export class TotvsService {
     cdUsuario: string
   }): Promise<TotvsApiResponse> {
     const { cdColigada, cdFilial, cdUsuario } = params
-    const acesso = '0'
     const pk = this._buildUsuarioFilialPk(cdColigada, cdFilial, cdUsuario)
-    const payload = this._buildUsuarioFilialPayload(
-      cdColigada,
-      cdFilial,
-      cdUsuario,
-      acesso,
-    )
+    const url = `${totvsApiConstants.urlAPI}/rmsrestdataserver/rest/EduUsuarioFilialData/${pk}`
 
     this.logger.log(
-      `[UsuarioFilial] Revogando acesso para usuário ${cdUsuario} (coligada ${cdColigada}, filial ${cdFilial})`,
+      `[UsuarioFilial] Removendo vínculo usuário-filial para usuário ${cdUsuario} (coligada ${cdColigada}, filial ${cdFilial})`,
     )
 
     try {
@@ -525,19 +615,14 @@ export class TotvsService {
         return { status: 'Sucesso', data: null }
       }
 
-      const acessoAtual = this._extrairAcessoUsuarioFilial(existente)
-      if (acessoAtual === acesso) {
-        this.logger.log(
-          `[UsuarioFilial] Acesso já revogado para ${cdUsuario} na PK ${pk} — skip`,
-        )
-        return { status: 'Sucesso', data: existente }
-      }
+      this.logger.log(
+        `[UsuarioFilial] DELETE de revogação para ${cdUsuario} na PK ${pk}`,
+      )
 
       const response = await axios({
-        method: 'patch',
-        url: `${totvsApiConstants.urlAPI}/rmsrestdataserver/rest/EduUsuarioFilialData/${pk}`,
+        method: 'delete',
+        url,
         headers: this._getHeadersUsuarioFilial(cdColigada, cdFilial),
-        data: payload,
       })
 
       this.handleTotvsResponse(
@@ -546,7 +631,7 @@ export class TotvsService {
       )
 
       this.logger.log(
-        `[UsuarioFilial] Acesso revogado para ${cdUsuario} na coligada ${cdColigada}, filial ${cdFilial}`,
+        `[UsuarioFilial] Vínculo usuário-filial removido para ${cdUsuario} na coligada ${cdColigada}, filial ${cdFilial}`,
       )
 
       return { status: 'Sucesso', data: response.data }
@@ -562,8 +647,7 @@ export class TotvsService {
         this.logger.error(error)
       }
 
-      this.logger.error('PAYLOAD:')
-      this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error(`DELETE: ${url}`)
       this.logger.error('------------------------------------')
 
       return {

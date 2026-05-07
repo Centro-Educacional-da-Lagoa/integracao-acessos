@@ -68,6 +68,11 @@ export class AccessProvisioningService {
       `[Revogação] Iniciando para ${ctx.CD_Identificador} (${papeis}, coligada ${ctx.CD_Coligada})`,
     )
 
+    if (ctx.TP_Origem_Revogacao === 'RESPONSAVEL') {
+      await this._revogarAcessoResponsavel(ctx)
+      return
+    }
+
     if (!this._isElegivelRevogacaoAluno(ctx)) {
       this.logger.log(
         `[Revogação] ${ctx.CD_Identificador} não está elegível para cancelamento de acesso — skip`,
@@ -110,6 +115,61 @@ export class AccessProvisioningService {
 
     await this._removerPerfisPorEntidade(ctx.CD_Usuario, ctx, [
       TipoEntidade.ALUNO,
+    ])
+  }
+
+  private async _revogarAcessoResponsavel(
+    ctx: PessoaAcessoContext,
+  ): Promise<void> {
+    const usuarioRevogacao = await this._resolverUsuarioRevogacao(ctx)
+
+    if (!usuarioRevogacao.cdUsuario) {
+      this.logger.log(
+        `[Revogação][Responsável] ${ctx.CD_Identificador} sem usuário resolvido (CD_Usuario/CD_CPF) — skip`,
+      )
+      return
+    }
+
+    if (!ctx.IN_Aluno && !ctx.IN_Funcionario) {
+      await this._revogarTodosUsuarioFilialAtivosResponsavel(
+        usuarioRevogacao.cdUsuario,
+      )
+      await this._removerPerfisPorEntidade(usuarioRevogacao.cdUsuario, ctx, [
+        TipoEntidade.RESPONSAVEL,
+      ])
+
+      if (usuarioRevogacao.inUsuarioAtivo === 0) {
+        this.logger.log(
+          `[Revogação][Responsável] Usuário ${usuarioRevogacao.cdUsuario} já inativo — limpeza de perfis e usuário-filial concluída`,
+        )
+        return
+      }
+
+      const result = await this.totvsService.inativarUsuario(
+        usuarioRevogacao.cdUsuario,
+      )
+      if (result.status === 'Error') {
+        this.logger.warn(
+          `[Revogação][Responsável] Falha ao inativar usuário ${usuarioRevogacao.cdUsuario}`,
+        )
+        return
+      }
+
+      this.logger.log(
+        `[Revogação][Responsável] Usuário ${usuarioRevogacao.cdUsuario} inativado com sucesso no TOTVS`,
+      )
+      return
+    }
+
+    if (ctx.IN_Aluno && !ctx.IN_Funcionario) {
+      await this._sincronizarUsuarioFilialResponsavelAluno(
+        ctx,
+        usuarioRevogacao.cdUsuario,
+      )
+    }
+
+    await this._removerPerfisPorEntidade(usuarioRevogacao.cdUsuario, ctx, [
+      TipoEntidade.RESPONSAVEL,
     ])
   }
 
@@ -432,6 +492,167 @@ export class AccessProvisioningService {
     }
   }
 
+  private async _sincronizarUsuarioFilialResponsavelAluno(
+    ctx: PessoaAcessoContext,
+    cdUsuario: string,
+  ): Promise<void> {
+    const alocacoes = this._resolverAlocacoesAlunoResponsavel(ctx)
+    if (alocacoes.length === 0) {
+      this.logger.warn(
+        `[UsuarioFilial][Responsável] Alocação de aluno ausente para usuário ${cdUsuario} — revogando todos os acessos usuário-filial ativos`,
+      )
+      await this._revogarTodosUsuarioFilialAtivosResponsavel(cdUsuario)
+      return
+    }
+
+    await this._revogarUsuarioFilialForaDasAlocacoes(cdUsuario, alocacoes)
+
+    for (const alocacao of alocacoes) {
+      const result = await this.totvsService.garantirUsuarioFilial({
+        cdColigada: alocacao.CD_Coligada,
+        cdFilial: alocacao.CD_Filial,
+        cdUsuario,
+        inFuncionario: ctx.IN_Funcionario ? 1 : 0,
+      })
+
+      if (result.status === 'Error') {
+        this.logger.warn(
+          `[UsuarioFilial][Responsável] Falha ao garantir acesso usuário-filial para ${cdUsuario} (coligada ${alocacao.CD_Coligada}, filial ${alocacao.CD_Filial})`,
+        )
+      }
+    }
+  }
+
+  private async _revogarTodosUsuarioFilialAtivosResponsavel(
+    cdUsuario: string,
+  ): Promise<void> {
+    const alocacoesAtivas =
+      await this.totvsService.fetchUsuarioFiliaisAtivos(cdUsuario)
+
+    for (const alocacao of alocacoesAtivas) {
+      const result = await this.totvsService.revogarUsuarioFilial({
+        cdColigada: alocacao.CODCOLIGADA,
+        cdFilial: alocacao.CODFILIAL,
+        cdUsuario,
+      })
+
+      if (result.status === 'Error') {
+        this.logger.warn(
+          `[UsuarioFilial][Responsável] Falha ao revogar acesso ativo para ${cdUsuario} (coligada ${alocacao.CODCOLIGADA}, filial ${alocacao.CODFILIAL})`,
+        )
+      }
+    }
+  }
+
+  private async _revogarUsuarioFilialForaDasAlocacoes(
+    cdUsuario: string,
+    alocacoesPermitidas: Array<{ CD_Coligada: number; CD_Filial: number }>,
+  ): Promise<void> {
+    const alocacoesAtivas =
+      await this.totvsService.fetchUsuarioFiliaisAtivos(cdUsuario)
+
+    const chavesPermitidas = new Set(
+      alocacoesPermitidas.map(
+        (alocacao) => `${alocacao.CD_Coligada}:${alocacao.CD_Filial}`,
+      ),
+    )
+
+    const alocacoesRevogacao = alocacoesAtivas.filter(
+      (alocacao) =>
+        !chavesPermitidas.has(`${alocacao.CODCOLIGADA}:${alocacao.CODFILIAL}`),
+    )
+
+    for (const alocacao of alocacoesRevogacao) {
+      const result = await this.totvsService.revogarUsuarioFilial({
+        cdColigada: alocacao.CODCOLIGADA,
+        cdFilial: alocacao.CODFILIAL,
+        cdUsuario,
+      })
+
+      if (result.status === 'Error') {
+        this.logger.warn(
+          `[UsuarioFilial][Responsável] Falha ao revogar filial fora da alocação permitida para ${cdUsuario} (coligada ${alocacao.CODCOLIGADA}, filial ${alocacao.CODFILIAL})`,
+        )
+      }
+    }
+  }
+
+  private _resolverAlocacoesAlunoResponsavel(
+    ctx: PessoaAcessoContext,
+  ): Array<{ CD_Coligada: number; CD_Filial: number }> {
+    if (ctx.CD_Alocacoes && ctx.CD_Alocacoes.length > 0) {
+      return this._deduplicarAlocacoes(ctx.CD_Alocacoes)
+    }
+
+    const cdColigadaAluno = ctx.CD_Coligada_Aluno ?? ctx.CD_Coligada
+    const filiaisAluno = ctx.CD_Filiais_Aluno ?? []
+
+    return this._deduplicarAlocacoes(
+      filiaisAluno.map((CD_Filial) => ({
+        CD_Coligada: cdColigadaAluno,
+        CD_Filial,
+      })),
+    )
+  }
+
+  private _deduplicarAlocacoes(
+    alocacoes: Array<{ CD_Coligada: number; CD_Filial: number }>,
+  ): Array<{ CD_Coligada: number; CD_Filial: number }> {
+    const map = new Map<string, { CD_Coligada: number; CD_Filial: number }>()
+
+    for (const alocacao of alocacoes) {
+      const key = `${alocacao.CD_Coligada}:${alocacao.CD_Filial}`
+      if (!map.has(key)) {
+        map.set(key, alocacao)
+      }
+    }
+
+    return [...map.values()]
+  }
+
+  private _resolverFiliaisResponsavel(ctx: PessoaAcessoContext): number[] {
+    if (ctx.CD_Filiais && ctx.CD_Filiais.length > 0) {
+      return [...new Set(ctx.CD_Filiais)]
+    }
+
+    if (ctx.CD_Filial !== null && ctx.CD_Filial !== undefined) {
+      return [ctx.CD_Filial]
+    }
+
+    return []
+  }
+
+  private async _resolverUsuarioRevogacao(ctx: PessoaAcessoContext): Promise<{
+    cdUsuario: string | null
+    inUsuarioAtivo: number | null
+  }> {
+    if (ctx.CD_Usuario) {
+      return {
+        cdUsuario: ctx.CD_Usuario,
+        inUsuarioAtivo: ctx.IN_Usuario_Ativo,
+      }
+    }
+
+    if (ctx.CD_CPF) {
+      const usuarioCpf = await this.totvsService.verificarUsuario(ctx.CD_CPF)
+      if (usuarioCpf) {
+        this.logger.log(
+          `[Revogação] Usuário resolvido por CD_CPF ${ctx.CD_CPF} para ${ctx.CD_Identificador}`,
+        )
+        return {
+          cdUsuario: ctx.CD_CPF,
+          inUsuarioAtivo:
+            typeof usuarioCpf.STATUS === 'number' ? usuarioCpf.STATUS : null,
+        }
+      }
+    }
+
+    return {
+      cdUsuario: null,
+      inUsuarioAtivo: null,
+    }
+  }
+
   private async _revogarUsuarioFilial(
     ctx: PessoaAcessoContext,
     cdUsuario: string,
@@ -690,11 +911,6 @@ export class AccessProvisioningService {
 
       const gpermisAtual: any[] = dadosUsuario.GPERMIS ?? []
 
-      console.log(
-        '🚀 ~ AccessProvisioningService ~ _removerPerfisPorEntidade ~ gpermisAtual:',
-        JSON.stringify(gpermisAtual, null, 2),
-      )
-
       let houveMudanca = false
       const gpermisAtualizado = gpermisAtual
         .map((permissao) => {
@@ -725,15 +941,6 @@ export class AccessProvisioningService {
           }
         })
         .filter(Boolean)
-
-      console.log(
-        '🚀 ~ AccessProvisioningService ~ _removerPerfisPorEntidade ~ gpermisAtualizado:',
-        JSON.stringify(gpermisAtualizado, null, 2),
-      )
-      console.log(
-        '🚀 ~ AccessProvisioningService ~ _removerPerfisPorEntidade ~ houveMudanca:',
-        houveMudanca,
-      )
 
       if (!houveMudanca) {
         this.logger.log(
