@@ -13,6 +13,16 @@ const DIRECTORY_SCOPES = [
 export class GoogleService {
   private readonly logger = new Logger(GoogleService.name)
 
+  private isProduction(): boolean {
+    return process.env.NODE_ENV === 'production'
+  }
+
+  private logSkippedNonProduction(action: string, email: string): void {
+    this.logger.warn(
+      `[Google] ${action} ignorado para ${email}: NODE_ENV=${process.env.NODE_ENV ?? 'undefined'}`,
+    )
+  }
+
   // ─── Verificação ──────────────────────────────────────────────────────────────
 
   async verifyGmailAccount(data: {
@@ -166,7 +176,14 @@ export class GoogleService {
     email: string,
     aluno: AlunoTotvsDto,
     coligada: ColigadaConfig,
-  ): Promise<'created' | 'activated' | 'already_active'> {
+  ): Promise<
+    'created' | 'activated' | 'already_active' | 'skipped_non_production'
+  > {
+    if (!this.isProduction()) {
+      this.logSkippedNonProduction('Provisionamento de Gmail de aluno', email)
+      return 'skipped_non_production'
+    }
+
     const { exists, suspended } = await this.verifyGmailAccount({
       TX_Email: email,
       CD_Coligada: coligada.id,
@@ -189,7 +206,17 @@ export class GoogleService {
   async cancelarEmailInstitucional(
     TX_Email: string,
     CD_Coligada: number,
-  ): Promise<'suspended' | 'already_suspended' | 'not_found'> {
+  ): Promise<
+    'suspended' | 'already_suspended' | 'not_found' | 'skipped_non_production'
+  > {
+    if (!this.isProduction()) {
+      this.logSkippedNonProduction(
+        'Cancelamento de Gmail institucional de aluno',
+        TX_Email,
+      )
+      return 'skipped_non_production'
+    }
+
     const { exists, suspended } = await this.verifyGmailAccount({
       TX_Email,
       CD_Coligada,
