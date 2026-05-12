@@ -46,6 +46,15 @@ export interface PessoaAcessoContext {
   /** 1 = a pessoa também é responsável */
   IN_Responsavel: number
 
+  /** 1 = vínculo de filiação; para responsável, concede perfil acadêmico */
+  IN_Filiacao?: number
+
+  /** 1 = responsável acadêmico */
+  IN_Responsavel_Academico?: number
+
+  /** 1 = responsável financeiro */
+  IN_Responsavel_Financeiro?: number
+
   /** 1 = possui matrícula regular ativa */
   IN_Existe_Matricula_Regular: number
 
@@ -56,6 +65,9 @@ export interface PessoaAcessoContext {
 
   /** 1 = inativação extra acadêmica */
   IN_Inativo_Extra: number
+
+  /** 1 = possui matrícula extra ativa em linha de responsável da coligada 5 */
+  IN_Matricula_Extra_Ativa_Coligada5?: number
 
   /** Código da coligada */
   CD_Coligada: number
@@ -68,6 +80,9 @@ export interface PessoaAcessoContext {
 
   /** Lista de combinações coligada+filial permitidas para operações agregadas */
   CD_Alocacoes?: Array<{ CD_Coligada: number; CD_Filial: number }>
+
+  /** Lista de combinações coligada+filial dos filhos vinculados ao responsável */
+  CD_Alocacoes_Responsavel?: Array<{ CD_Coligada: number; CD_Filial: number }>
 
   /** Coligada em que o responsável também está alocado como aluno */
   CD_Coligada_Aluno?: number | null

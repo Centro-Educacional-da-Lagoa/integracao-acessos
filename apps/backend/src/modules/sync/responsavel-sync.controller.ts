@@ -8,7 +8,10 @@ import {
   Post,
 } from '@nestjs/common'
 import { ZodError } from 'zod'
-import { CancelamentoResponsavelSchema } from './dto/responsavel-cancelamento.dto'
+import {
+  AtivacaoResponsavelSchema,
+  CancelamentoResponsavelSchema,
+} from './dto/responsavel-cancelamento.dto'
 import { ResponsavelSyncService } from './responsavel-sync.service'
 
 @Controller()
@@ -16,6 +19,44 @@ export class ResponsavelSyncController {
   private readonly logger = new Logger(ResponsavelSyncController.name)
 
   constructor(private readonly responsavelSyncService: ResponsavelSyncService) {}
+
+  @Post('sync/responsaveis')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async triggerSyncLote(): Promise<{ message: string }> {
+    this.logger.log(
+      'Concessão em lote de responsáveis disparada manualmente via API',
+    )
+
+    this.responsavelSyncService.syncResponsaveis().catch((error) => {
+      this.logger.error(
+        'Falha crítica na concessão em lote de responsáveis',
+        error,
+      )
+    })
+
+    return { message: 'Concessão de acessos de responsáveis iniciada.' }
+  }
+
+  @Post('sync/responsaveis/responsavel')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async triggerSyncResponsavel(
+    @Body() body: unknown,
+  ): Promise<{ message: string }> {
+    const payload = this.parseBody(body, AtivacaoResponsavelSchema)
+
+    this.logger.log(
+      `Concessão unitária de responsável disparada (pessoa ${payload.CD_Pessoa ?? 'NULL'}, cpf ${payload.CD_CPF ?? 'NULL'}, ra ${payload.CD_Registro_Academico ?? 'NULL'})`,
+    )
+
+    this.responsavelSyncService.syncResponsavel(payload).catch((error) => {
+      this.logger.error(
+        'Falha crítica na concessão unitária de responsável',
+        error,
+      )
+    })
+
+    return { message: 'Concessão unitária de responsável iniciada.' }
+  }
 
   @Post('sync/responsaveis/cancelamentos')
   @HttpCode(HttpStatus.ACCEPTED)

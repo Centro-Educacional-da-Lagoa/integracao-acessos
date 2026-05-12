@@ -3,7 +3,10 @@ import { TotvsService } from '../../integrations/totvs/totvs.service'
 import { GoogleService } from '../../integrations/google/google.service'
 import { PessoaAcessoContext } from './interfaces/pessoa-acesso-context.interface'
 import { TipoEntidade } from './enums/tipo-entidade.enum'
-import { PERFIS_ACESSO } from './constants/perfis-acesso.constants'
+import {
+  PERFIS_ACESSO,
+  PerfilAcessoEntry,
+} from './constants/perfis-acesso.constants'
 
 // ─── Tipos internos ────────────────────────────────────────────────────────────
 
@@ -471,6 +474,16 @@ export class AccessProvisioningService {
     ctx: PessoaAcessoContext,
     cdUsuario: string,
   ): Promise<void> {
+    if (ctx.IN_Responsavel && !ctx.IN_Funcionario) {
+      await this._sincronizarUsuarioFilialResponsavelConcessao(ctx, cdUsuario)
+      return
+    }
+
+    if (ctx.IN_Responsavel && ctx.CD_Alocacoes && ctx.CD_Alocacoes.length > 0) {
+      await this._garantirUsuarioFiliaisPorAlocacao(ctx, cdUsuario)
+      return
+    }
+
     if (ctx.CD_Filial === null || ctx.CD_Filial === undefined) {
       this.logger.warn(
         `[UsuarioFilial] CD_Filial ausente para usuário ${cdUsuario} na coligada ${ctx.CD_Coligada} — etapa ignorada`,
@@ -489,6 +502,59 @@ export class AccessProvisioningService {
       this.logger.warn(
         `[UsuarioFilial] Falha ao garantir acesso usuário-filial para ${cdUsuario} (coligada ${ctx.CD_Coligada}, filial ${ctx.CD_Filial})`,
       )
+    }
+  }
+
+  private async _sincronizarUsuarioFilialResponsavelConcessao(
+    ctx: PessoaAcessoContext,
+    cdUsuario: string,
+  ): Promise<void> {
+    const alocacoes = this._resolverAlocacoesConcessaoResponsavel(ctx)
+
+    if (alocacoes.length === 0) {
+      this.logger.warn(
+        `[UsuarioFilial][Responsável] Nenhuma alocação permitida para concessão do usuário ${cdUsuario} — etapa ignorada para evitar revogação indevida`,
+      )
+      return
+    }
+
+    await this._revogarUsuarioFilialForaDasAlocacoes(cdUsuario, alocacoes)
+
+    for (const alocacao of alocacoes) {
+      const result = await this.totvsService.garantirUsuarioFilial({
+        cdColigada: alocacao.CD_Coligada,
+        cdFilial: alocacao.CD_Filial,
+        cdUsuario,
+        inFuncionario: 0,
+      })
+
+      if (result.status === 'Error') {
+        this.logger.warn(
+          `[UsuarioFilial][Responsável] Falha ao garantir acesso usuário-filial para ${cdUsuario} (coligada ${alocacao.CD_Coligada}, filial ${alocacao.CD_Filial})`,
+        )
+      }
+    }
+  }
+
+  private async _garantirUsuarioFiliaisPorAlocacao(
+    ctx: PessoaAcessoContext,
+    cdUsuario: string,
+  ): Promise<void> {
+    const alocacoes = this._deduplicarAlocacoes(ctx.CD_Alocacoes ?? [])
+
+    for (const alocacao of alocacoes) {
+      const result = await this.totvsService.garantirUsuarioFilial({
+        cdColigada: alocacao.CD_Coligada,
+        cdFilial: alocacao.CD_Filial,
+        cdUsuario,
+        inFuncionario: ctx.IN_Funcionario,
+      })
+
+      if (result.status === 'Error') {
+        this.logger.warn(
+          `[UsuarioFilial][Responsável] Falha ao garantir acesso usuário-filial para ${cdUsuario} (coligada ${alocacao.CD_Coligada}, filial ${alocacao.CD_Filial})`,
+        )
+      }
     }
   }
 
@@ -575,6 +641,26 @@ export class AccessProvisioningService {
         )
       }
     }
+  }
+
+  private _resolverAlocacoesConcessaoResponsavel(
+    ctx: PessoaAcessoContext,
+  ): Array<{ CD_Coligada: number; CD_Filial: number }> {
+    return this._deduplicarAlocacoes([
+      ...(ctx.CD_Alocacoes_Responsavel ?? []),
+      ...this._resolverAlocacoesAlunoResponsavel(ctx),
+      ...this._resolverAlocacoesExtraResponsavel(ctx),
+    ])
+  }
+
+  private _resolverAlocacoesExtraResponsavel(
+    ctx: PessoaAcessoContext,
+  ): Array<{ CD_Coligada: number; CD_Filial: number }> {
+    if (ctx.IN_Matricula_Extra_Ativa_Coligada5 !== 1) {
+      return []
+    }
+
+    return [{ CD_Coligada: 6, CD_Filial: 1 }]
   }
 
   private _resolverAlocacoesAlunoResponsavel(
@@ -751,7 +837,7 @@ export class AccessProvisioningService {
           continue
         }
 
-        if (papeis.includes(mapeamento.TP_Entidade)) {
+        if (this._isPerfilEsperadoParaContexto(mapeamento, papeis, ctx)) {
           resultado.push(perfilItem)
         }
         // else: descarta (TP_Entidade do perfil não é um papel ativo desta pessoa)
@@ -791,12 +877,13 @@ export class AccessProvisioningService {
       coligadasMap.get(codColigada)!.add(codPerfil)
     }
 
-    // Perfis esperados da constante para a coligada atual + todos os papéis ativos da pessoa
+    // Perfis esperados da constante para as coligadas aplicáveis + todos os papéis ativos da pessoa
     const papeis = this._getPapeisAtivos(ctx)
+    const coligadasPerfil = this._resolverColigadasPerfil(ctx)
     for (const entry of PERFIS_ACESSO) {
       if (
-        entry.CD_Coligada === ctx.CD_Coligada &&
-        papeis.includes(entry.TP_Entidade)
+        coligadasPerfil.includes(entry.CD_Coligada) &&
+        this._isPerfilEsperadoParaContexto(entry, papeis, ctx)
       ) {
         registrarPerfil(entry.CD_Sistema, entry.CD_Coligada, entry.NM_Perfil)
       }
@@ -894,6 +981,16 @@ export class AccessProvisioningService {
     }
   }
 
+  private _resolverColigadasPerfil(ctx: PessoaAcessoContext): number[] {
+    const coligadas = [ctx.CD_Coligada]
+
+    if (ctx.IN_Responsavel && ctx.IN_Matricula_Extra_Ativa_Coligada5 === 1) {
+      coligadas.push(6)
+    }
+
+    return [...new Set(coligadas)]
+  }
+
   private async _removerPerfisPorEntidade(
     cdUsuario: string,
     ctx: PessoaAcessoContext,
@@ -910,62 +1007,43 @@ export class AccessProvisioningService {
       }
 
       const gpermisAtual: any[] = dadosUsuario.GPERMIS ?? []
+      const perfisRemocao = gpermisAtual.flatMap((permissao) => {
+        const perfisAtuais: GusrPerfilItem[] = permissao.GUSRPERFIL ?? []
 
-      let houveMudanca = false
-      const gpermisAtualizado = gpermisAtual
-        .map((permissao) => {
-          const perfisAtuais = permissao.GUSRPERFIL ?? []
-          const perfisMantidos = perfisAtuais.filter(
-            (perfil: GusrPerfilItem) => {
-              const deveRemover = this._deveRemoverPerfil(
-                perfil,
-                ctx,
-                entidades,
-              )
+        return perfisAtuais.filter((perfil) =>
+          this._deveRemoverPerfil(perfil, ctx, entidades),
+        )
+      })
 
-              if (deveRemover) {
-                houveMudanca = true
-              }
-
-              return !deveRemover
-            },
-          )
-
-          if (perfisMantidos.length === 0) {
-            return null
-          }
-
-          return {
-            ...permissao,
-            GUSRPERFIL: perfisMantidos,
-          }
-        })
-        .filter(Boolean)
-
-      if (!houveMudanca) {
+      if (perfisRemocao.length === 0) {
         this.logger.log(
           `[Revogação] [Sistema ${codSistema}] Usuário ${cdUsuario} sem perfis a remover na coligada ${ctx.CD_Coligada}`,
         )
         continue
       }
 
-      const result = await this.totvsService.atualizarPerfisUsuario(
-        cdUsuario,
-        codSistema,
-        gpermisAtualizado,
-        dadosUsuario,
-      )
+      let houveFalha = false
 
-      if (result.status === 'Error') {
-        this.logger.warn(
-          `[Revogação] [Sistema ${codSistema}] Falha ao remover perfis do usuário ${cdUsuario}`,
-        )
-        continue
+      for (const perfil of perfisRemocao) {
+        const result = await this.totvsService.removerPerfilUsuario({
+          cdUsuario,
+          cdColigada: perfil.CODCOLIGADA,
+          codPerfil: perfil.CODPERFIL,
+        })
+
+        if (result.status === 'Error') {
+          houveFalha = true
+          this.logger.warn(
+            `[Revogação] [Sistema ${codSistema}] Falha ao remover perfil ${perfil.CODPERFIL} do usuário ${cdUsuario} na coligada ${perfil.CODCOLIGADA}`,
+          )
+        }
       }
 
-      this.logger.log(
-        `[Revogação] [Sistema ${codSistema}] Perfis removidos do usuário ${cdUsuario}`,
-      )
+      if (!houveFalha) {
+        this.logger.log(
+          `[Revogação] [Sistema ${codSistema}] Perfis removidos do usuário ${cdUsuario}`,
+        )
+      }
     }
   }
 
@@ -989,5 +1067,29 @@ export class AccessProvisioningService {
       mapeamento.CD_Coligada === ctx.CD_Coligada &&
       entidades.includes(mapeamento.TP_Entidade)
     )
+  }
+
+  private _isPerfilEsperadoParaContexto(
+    perfil: PerfilAcessoEntry,
+    papeis: TipoEntidade[],
+    ctx: PessoaAcessoContext,
+  ): boolean {
+    if (!papeis.includes(perfil.TP_Entidade)) {
+      return false
+    }
+
+    if (perfil.TP_Entidade !== TipoEntidade.RESPONSAVEL) {
+      return true
+    }
+
+    if (perfil.TP_Vinculo_Responsavel === 'ACADEMICO') {
+      return !!ctx.IN_Filiacao || !!ctx.IN_Responsavel_Academico
+    }
+
+    if (perfil.TP_Vinculo_Responsavel === 'FINANCEIRO') {
+      return !!ctx.IN_Responsavel_Financeiro
+    }
+
+    return true
   }
 }

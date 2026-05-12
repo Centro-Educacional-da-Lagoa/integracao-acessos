@@ -5,8 +5,26 @@ import { TotvsService } from '../integrations/totvs/totvs.service'
 import { AccessProvisioningService } from './access-provisioning/access-provisioning.service'
 import { PessoaAcessoContext } from './access-provisioning/interfaces/pessoa-acesso-context.interface'
 import { ResponsavelCancelamentoTotvsDto } from '../integrations/totvs/dto/responsavel-cancelamento-totvs.dto'
+import { ResponsavelAtivacaoTotvsDto } from '../integrations/totvs/dto/responsavel-ativacao-totvs.dto'
+
+type ResponsavelTotvsDto =
+  | ResponsavelCancelamentoTotvsDto
+  | ResponsavelAtivacaoTotvsDto
+
+type ResponsavelConsolidado = ResponsavelTotvsDto & {
+  CD_Filiais?: number[]
+  CD_Filiais_Aluno?: number[]
+  CD_Alocacoes?: Array<{ CD_Coligada: number; CD_Filial: number }>
+  CD_Alocacoes_Responsavel?: Array<{ CD_Coligada: number; CD_Filial: number }>
+  IN_Matricula_Extra_Ativa_Coligada5?: number
+}
 
 export interface CancelamentoResponsavelLoteJobData {
+  CD_Periodo_Letivo: string
+  TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO'
+}
+
+export interface AtivacaoResponsavelLoteJobData {
   CD_Periodo_Letivo: string
   TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO'
 }
@@ -15,8 +33,18 @@ export interface CancelamentoResponsavelUnitarioJobData {
   CD_Periodo_Letivo: string
   CD_Pessoa: number | null
   CD_CPF: string | null
+  CD_Registro_Academico?: string | null
   TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' | 'WEBHOOK'
   responsaveis?: ResponsavelCancelamentoTotvsDto[]
+}
+
+export interface AtivacaoResponsavelUnitarioJobData {
+  CD_Periodo_Letivo: string
+  CD_Pessoa: number | null
+  CD_CPF: string | null
+  CD_Registro_Academico: string | null
+  TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' | 'WEBHOOK'
+  responsaveis?: ResponsavelAtivacaoTotvsDto[]
 }
 
 @Processor('responsavel-sync')
@@ -48,6 +76,37 @@ export class ResponsavelSyncProcessor {
     this.logger.log(
       `[Job ${job.id}] Cancelamento global de responsáveis concluído`,
     )
+  }
+
+  @Process('sync-responsaveis')
+  async handleSyncResponsaveis(
+    job: Job<AtivacaoResponsavelLoteJobData>,
+  ): Promise<void> {
+    const { CD_Periodo_Letivo, TP_Origem_Disparo } = job.data
+
+    this.logger.log(
+      `[Job ${job.id}] Iniciando concessão global de responsáveis (${TP_Origem_Disparo})`,
+    )
+
+    await this.syncResponsaveis(CD_Periodo_Letivo, TP_Origem_Disparo)
+
+    this.logger.log(
+      `[Job ${job.id}] Concessão global de responsáveis concluída`,
+    )
+  }
+
+  @Process('sync-responsavel-unitario')
+  async handleSyncResponsavelUnitario(
+    job: Job<AtivacaoResponsavelUnitarioJobData>,
+  ): Promise<void> {
+    const { CD_Pessoa, CD_CPF, CD_Registro_Academico, TP_Origem_Disparo } =
+      job.data
+
+    this.logger.debug(
+      `[Job ${job.id}] Concessão unitária de responsável (pessoa ${CD_Pessoa ?? 'NULL'}, cpf ${CD_CPF ?? 'NULL'}, ra ${CD_Registro_Academico ?? 'NULL'}, origem ${TP_Origem_Disparo})`,
+    )
+
+    await this.syncResponsavelUnitario(job.data)
   }
 
   @Process('cancelamento-responsavel-unitario')
@@ -105,6 +164,50 @@ export class ResponsavelSyncProcessor {
     )
   }
 
+  private async syncResponsaveis(
+    CD_Periodo_Letivo: string,
+    TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO',
+  ): Promise<void> {
+    const responsaveis = await this.totvsService.fetchResponsaveisAtivacao(
+      CD_Periodo_Letivo,
+      null,
+      null,
+      null,
+    )
+
+    this.logger.log(
+      `${responsaveis.length} linha(s) de responsável encontradas para concessão global`,
+    )
+
+    const grupos = this.agruparResponsaveis(responsaveis, 'ConcessaoResponsavel')
+
+    const jobs = await Promise.all(
+      [...grupos.values()].map((grupo) => {
+        const representativo = grupo[0]
+
+        return this.responsavelSyncQueue.add(
+          'sync-responsavel-unitario',
+          {
+            CD_Periodo_Letivo,
+            CD_Pessoa: this.parsePessoa(representativo.CD_Pessoa),
+            CD_CPF: representativo.CD_CPF ?? null,
+            CD_Registro_Academico: null,
+            TP_Origem_Disparo,
+            responsaveis: grupo,
+          } as AtivacaoResponsavelUnitarioJobData,
+          {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 2000 },
+          },
+        )
+      }),
+    )
+
+    this.logger.log(
+      `${jobs.length} job(s) consolidado(s) de concessão de responsável adicionados`,
+    )
+  }
+
   private async syncCancelamentoResponsavelUnitario(
     data: CancelamentoResponsavelUnitarioJobData,
   ): Promise<void> {
@@ -117,6 +220,7 @@ export class ResponsavelSyncProcessor {
             data.CD_Periodo_Letivo,
             data.CD_Pessoa,
             data.CD_CPF,
+            data.CD_Registro_Academico ?? null,
           )
 
     if (responsaveis.length === 0) {
@@ -126,32 +230,79 @@ export class ResponsavelSyncProcessor {
       return
     }
 
-    const grupos = this.agruparResponsaveis(responsaveis)
-    const consolidado = this.selecionarGrupoUnitario(grupos, data)
+    const grupos = this.agruparResponsaveis(
+      responsaveis,
+      'CancelamentoResponsavel',
+    )
+    const consolidados = this.selecionarGruposUnitarios(grupos, data)
 
-    if (!consolidado) {
+    if (consolidados.length === 0) {
       this.logger.warn(
         `[CancelamentoResponsavel] Não foi possível consolidar grupo de responsável (pessoa ${data.CD_Pessoa ?? 'NULL'}, cpf ${data.CD_CPF ?? 'NULL'})`,
       )
       return
     }
 
-    if (!consolidado.CD_Pessoa) {
+    for (const consolidado of consolidados) {
+      if (!consolidado.CD_Pessoa) {
+        this.logger.warn(
+          `[CancelamentoResponsavel] Consolidado sem CD_Pessoa (coligada ${consolidado.CD_Coligada}, cpf ${consolidado.CD_CPF ?? 'NULL'}) — seguindo com fallback por CD_Usuario/CD_CPF`,
+        )
+      }
+
+      const ctx = this.mapToPessoaAcessoContext(consolidado)
+      await this.accessProvisioningService.revogarAcesso(ctx)
+    }
+  }
+
+  private async syncResponsavelUnitario(
+    data: AtivacaoResponsavelUnitarioJobData,
+  ): Promise<void> {
+    const responsaveis =
+      data.responsaveis &&
+      Array.isArray(data.responsaveis) &&
+      data.responsaveis.length > 0
+        ? data.responsaveis
+        : await this.totvsService.fetchResponsaveisAtivacao(
+            data.CD_Periodo_Letivo,
+            data.CD_Pessoa,
+            data.CD_CPF,
+            data.CD_Registro_Academico,
+          )
+
+    if (responsaveis.length === 0) {
       this.logger.warn(
-        `[CancelamentoResponsavel] Consolidado sem CD_Pessoa (coligada ${consolidado.CD_Coligada}, cpf ${consolidado.CD_CPF ?? 'NULL'}) — seguindo com fallback por CD_Usuario/CD_CPF`,
+        `[ConcessaoResponsavel] Responsável não encontrado globalmente (pessoa ${data.CD_Pessoa ?? 'NULL'}, cpf ${data.CD_CPF ?? 'NULL'}, ra ${data.CD_Registro_Academico ?? 'NULL'})`,
       )
+      return
     }
 
-    const ctx = this.mapToPessoaAcessoContext(consolidado)
-    await this.accessProvisioningService.revogarAcesso(ctx)
+    const grupos = this.agruparResponsaveis(responsaveis, 'ConcessaoResponsavel')
+    const consolidados = this.selecionarGruposUnitarios(grupos, data)
+
+    if (consolidados.length === 0) {
+      this.logger.warn(
+        `[ConcessaoResponsavel] Não foi possível consolidar grupo de responsável (pessoa ${data.CD_Pessoa ?? 'NULL'}, cpf ${data.CD_CPF ?? 'NULL'}, ra ${data.CD_Registro_Academico ?? 'NULL'})`,
+      )
+      return
+    }
+
+    for (const consolidado of consolidados) {
+      if (!consolidado.CD_CPF) {
+        this.logger.warn(
+          `[ConcessaoResponsavel] Responsável sem CPF ignorado (pessoa ${consolidado.CD_Pessoa ?? 'NULL'}, coligada ${consolidado.CD_Coligada})`,
+        )
+        continue
+      }
+
+      const ctx = this.mapToPessoaAcessoContext(consolidado, false)
+      await this.accessProvisioningService.provisionarAcesso(ctx)
+    }
   }
 
   private mapToPessoaAcessoContext(
-    responsavel: ResponsavelCancelamentoTotvsDto & {
-      CD_Filiais?: number[]
-      CD_Filiais_Aluno?: number[]
-      CD_Alocacoes?: Array<{ CD_Coligada: number; CD_Filial: number }>
-    },
+    responsavel: ResponsavelConsolidado,
+    isRevogacao = true,
   ): PessoaAcessoContext {
     const inResponsavel = responsavel.IN_Filiacao
       ? 1
@@ -160,7 +311,7 @@ export class ResponsavelSyncProcessor {
         : 0
 
     return {
-      TP_Origem_Revogacao: 'RESPONSAVEL',
+      TP_Origem_Revogacao: isRevogacao ? 'RESPONSAVEL' : undefined,
       CD_Pessoa: responsavel.CD_Pessoa ?? '',
       CD_Usuario: responsavel.CD_Usuario,
       CD_CPF: responsavel.CD_CPF,
@@ -173,14 +324,20 @@ export class ResponsavelSyncProcessor {
       IN_Aluno: responsavel.IN_Aluno,
       IN_Funcionario: responsavel.IN_Funcionario,
       IN_Responsavel: inResponsavel,
+      IN_Filiacao: responsavel.IN_Filiacao,
+      IN_Responsavel_Academico: responsavel.IN_Responsavel_Academico,
+      IN_Responsavel_Financeiro: responsavel.IN_Responsavel_Financeiro,
       IN_Existe_Matricula_Regular: responsavel.IN_Existe_Matricula_Regular,
       IN_Inativo_Regular: responsavel.IN_Inativo_Regular,
       IN_Existe_Matricula_Extra: responsavel.IN_Existe_Matricula_Extra,
       IN_Inativo_Extra: responsavel.IN_Inativo_Extra,
+      IN_Matricula_Extra_Ativa_Coligada5:
+        responsavel.IN_Matricula_Extra_Ativa_Coligada5,
       CD_Coligada: responsavel.CD_Coligada,
       CD_Filial: responsavel.CD_Filial ?? null,
       CD_Filiais: responsavel.CD_Filiais,
       CD_Alocacoes: responsavel.CD_Alocacoes,
+      CD_Alocacoes_Responsavel: responsavel.CD_Alocacoes_Responsavel,
       CD_Coligada_Aluno: responsavel.CD_Coligada_Aluno ?? null,
       CD_Filiais_Aluno: responsavel.CD_Filiais_Aluno,
       NM_Dominio_Email_Institucional: 'n/a',
@@ -189,15 +346,16 @@ export class ResponsavelSyncProcessor {
   }
 
   private agruparResponsaveis(
-    responsaveis: ResponsavelCancelamentoTotvsDto[],
-  ): Map<string, ResponsavelCancelamentoTotvsDto[]> {
-    const grupos = new Map<string, ResponsavelCancelamentoTotvsDto[]>()
+    responsaveis: ResponsavelTotvsDto[],
+    contexto = 'Responsavel',
+  ): Map<string, ResponsavelTotvsDto[]> {
+    const grupos = new Map<string, ResponsavelTotvsDto[]>()
 
     for (const responsavel of responsaveis) {
       const chave = this.getResponsavelKey(responsavel)
       if (!chave) {
         this.logger.warn(
-          `[CancelamentoResponsavel] Registro ignorado sem CD_Pessoa e CD_CPF (coligada ${responsavel.CD_Coligada})`,
+          `[${contexto}] Registro ignorado sem CD_Pessoa e CD_CPF (coligada ${responsavel.CD_Coligada})`,
         )
         continue
       }
@@ -210,14 +368,32 @@ export class ResponsavelSyncProcessor {
     return grupos
   }
 
+  private selecionarGruposUnitarios(
+    grupos: Map<string, ResponsavelTotvsDto[]>,
+    data: CancelamentoResponsavelUnitarioJobData | AtivacaoResponsavelUnitarioJobData,
+  ): ResponsavelConsolidado[] {
+    if (this.deveProcessarTodosGruposPorRa(data)) {
+      return [...grupos.values()].map((grupo) => this.consolidarGrupo(grupo))
+    }
+
+    const consolidado = this.selecionarGrupoUnitario(grupos, data)
+    return consolidado ? [consolidado] : []
+  }
+
+  private deveProcessarTodosGruposPorRa(
+    data: CancelamentoResponsavelUnitarioJobData | AtivacaoResponsavelUnitarioJobData,
+  ): boolean {
+    return (
+      !!data.CD_Registro_Academico &&
+      data.CD_Pessoa === null &&
+      !data.CD_CPF
+    )
+  }
+
   private selecionarGrupoUnitario(
-    grupos: Map<string, ResponsavelCancelamentoTotvsDto[]>,
-    data: CancelamentoResponsavelUnitarioJobData,
-  ): (ResponsavelCancelamentoTotvsDto & {
-    CD_Filiais?: number[]
-    CD_Filiais_Aluno?: number[]
-    CD_Alocacoes?: Array<{ CD_Coligada: number; CD_Filial: number }>
-  }) | null {
+    grupos: Map<string, ResponsavelTotvsDto[]>,
+    data: CancelamentoResponsavelUnitarioJobData | AtivacaoResponsavelUnitarioJobData,
+  ): ResponsavelConsolidado | null {
     const chavePessoa =
       data.CD_Pessoa !== null && data.CD_Pessoa !== undefined
         ? `P:${data.CD_Pessoa}`
@@ -237,11 +413,13 @@ export class ResponsavelSyncProcessor {
   }
 
   private consolidarGrupo(
-    grupo: ResponsavelCancelamentoTotvsDto[],
-  ): ResponsavelCancelamentoTotvsDto & {
+    grupo: ResponsavelTotvsDto[],
+  ): ResponsavelTotvsDto & {
     CD_Filiais: number[]
     CD_Filiais_Aluno: number[]
     CD_Alocacoes: Array<{ CD_Coligada: number; CD_Filial: number }>
+    CD_Alocacoes_Responsavel: Array<{ CD_Coligada: number; CD_Filial: number }>
+    IN_Matricula_Extra_Ativa_Coligada5: number
   } {
     const base = grupo[0]
     const alocacaoMap = new Map<
@@ -272,6 +450,16 @@ export class ResponsavelSyncProcessor {
         item.CD_Coligada_Aluno !== null &&
         item.CD_Coligada_Aluno !== undefined,
     )
+    const possuiMatriculaExtraAtivaColigada5 = grupo.some(
+      (item) =>
+        item.CD_Coligada === 5 &&
+        item.IN_Existe_Matricula_Extra === 1 &&
+        item.IN_Inativo_Extra !== 1,
+    )
+
+    if (possuiMatriculaExtraAtivaColigada5) {
+      this.addAlocacao(alocacaoAlunoMap, 6, 1)
+    }
 
     return {
       ...base,
@@ -300,9 +488,13 @@ export class ResponsavelSyncProcessor {
         'IN_Existe_Matricula_Extra',
       ),
       IN_Inativo_Extra: this.consolidarFlag(grupo, 'IN_Inativo_Extra'),
+      IN_Matricula_Extra_Ativa_Coligada5: possuiMatriculaExtraAtivaColigada5
+        ? 1
+        : 0,
       CD_Filial: alocacoes.length > 0 ? alocacoes[0].CD_Filial : null,
       CD_Filiais: [...new Set(alocacoes.map((item) => item.CD_Filial))],
       CD_Alocacoes: alocacoesAluno,
+      CD_Alocacoes_Responsavel: alocacoes,
       CD_Coligada_Aluno:
         primeiroComColigadaAluno?.CD_Coligada_Aluno ??
         base.CD_Coligada_Aluno ??
@@ -333,7 +525,7 @@ export class ResponsavelSyncProcessor {
   }
 
   private consolidarFlag(
-    grupo: ResponsavelCancelamentoTotvsDto[],
+    grupo: ResponsavelTotvsDto[],
     campo:
       | 'IN_Aluno'
       | 'IN_Funcionario'
@@ -349,7 +541,7 @@ export class ResponsavelSyncProcessor {
   }
 
   private consolidarFlagUsuarioAtivo(
-    grupo: ResponsavelCancelamentoTotvsDto[],
+    grupo: ResponsavelTotvsDto[],
   ): number | null {
     if (grupo.some((item) => item.IN_Usuario_Ativo === 1)) {
       return 1
@@ -363,14 +555,14 @@ export class ResponsavelSyncProcessor {
   }
 
   private getResponsavelKey(
-    responsavel: ResponsavelCancelamentoTotvsDto,
+    responsavel: ResponsavelTotvsDto,
   ): string | null {
-    if (responsavel.CD_Pessoa) {
-      return `P:${responsavel.CD_Pessoa}`
-    }
-
     if (responsavel.CD_CPF) {
       return `C:${responsavel.CD_CPF}`
+    }
+
+    if (responsavel.CD_Pessoa) {
+      return `P:${responsavel.CD_Pessoa}`
     }
 
     return null

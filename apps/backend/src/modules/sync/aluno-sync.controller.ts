@@ -88,7 +88,7 @@ export class AlunoSyncController {
 
     return {
       message:
-        'Webhook unitário recebido. Cancelamento e concessão foram enfileirados.',
+        'Webhook unitário recebido. Cancelamento e concessão de aluno e responsáveis foram enfileirados.',
     }
   }
 

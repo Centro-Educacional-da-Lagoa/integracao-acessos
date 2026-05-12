@@ -14,6 +14,7 @@ import {
   getColigadaConfigById,
   listColigadasConfig,
 } from './utils/coligadas-config'
+import { ResponsavelSyncService } from './responsavel-sync.service'
 
 @Injectable()
 export class AlunoSyncService {
@@ -22,6 +23,7 @@ export class AlunoSyncService {
 
   constructor(
     @InjectQueue('aluno-sync') private readonly alunoSyncQueue: Queue,
+    private readonly responsavelSyncService: ResponsavelSyncService,
   ) {}
 
   /**
@@ -298,6 +300,32 @@ export class AlunoSyncService {
     this.logger.log(
       `Job de webhook do aluno ${data.CD_Registro_Academico} adicionado à fila (ID: ${job.id})`,
     )
+
+    await this.syncResponsaveisPorWebhookAluno({
+      CD_Periodo_Letivo,
+      CD_Registro_Academico: data.CD_Registro_Academico,
+    })
+  }
+
+  private async syncResponsaveisPorWebhookAluno(data: {
+    CD_Periodo_Letivo: string
+    CD_Registro_Academico: string
+  }): Promise<void> {
+    this.logger.log(
+      `Adicionando jobs de responsáveis por webhook de aluno ${data.CD_Registro_Academico}`,
+    )
+
+    await this.responsavelSyncService.syncCancelamentoResponsavel({
+      CD_Periodo_Letivo: data.CD_Periodo_Letivo,
+      CD_Registro_Academico: data.CD_Registro_Academico,
+      TP_Origem_Disparo: 'WEBHOOK',
+    })
+
+    await this.responsavelSyncService.syncResponsavel({
+      CD_Periodo_Letivo: data.CD_Periodo_Letivo,
+      CD_Registro_Academico: data.CD_Registro_Academico,
+      TP_Origem_Disparo: 'WEBHOOK',
+    })
   }
 
   private resolveColigadaFromConfig(): ColigadaConfig {

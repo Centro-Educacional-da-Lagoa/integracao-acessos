@@ -7,6 +7,7 @@ import { AlunoSyncProcessor } from './aluno-sync.processor'
 import { ResponsavelSyncController } from './responsavel-sync.controller'
 import { ResponsavelSyncProcessor } from './responsavel-sync.processor'
 import { ResponsavelSyncService } from './responsavel-sync.service'
+import { ResponsavelSyncCron } from './responsavel-sync.cron'
 import { TotvsModule } from '../integrations/totvs/totvs.module'
 import { GoogleModule } from '../integrations/google/google.module'
 import { PrismaService } from '../../core/prisma/prisma.service'
@@ -39,6 +40,7 @@ import { AccessProvisioningModule } from './access-provisioning/access-provision
     AlunoSyncCron,
     AlunoSyncProcessor,
     ResponsavelSyncService,
+    ResponsavelSyncCron,
     ResponsavelSyncProcessor,
     PrismaService,
   ],

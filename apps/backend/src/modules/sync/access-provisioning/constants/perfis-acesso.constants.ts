@@ -9,6 +9,8 @@ export interface PerfilAcessoEntry {
   CD_Coligada: number
   /** Tipo da entidade ao qual este perfil pertence */
   TP_Entidade: TipoEntidade
+  /** Subtipo de responsável usado para evitar concessão cruzada de perfis */
+  TP_Vinculo_Responsavel?: 'ACADEMICO' | 'FINANCEIRO'
 }
 
 export const PERFIS_ACESSO: PerfilAcessoEntry[] = [
@@ -41,23 +43,41 @@ export const PERFIS_ACESSO: PerfilAcessoEntry[] = [
     CD_Sistema: 'S',
     CD_Coligada: 1,
     TP_Entidade: TipoEntidade.RESPONSAVEL,
+    TP_Vinculo_Responsavel: 'FINANCEIRO',
   },
   {
     NM_Perfil: 'RespAcad_CEL',
     CD_Sistema: 'S',
     CD_Coligada: 1,
     TP_Entidade: TipoEntidade.RESPONSAVEL,
+    TP_Vinculo_Responsavel: 'ACADEMICO',
   },
   {
     NM_Perfil: 'RespAcad_LFB',
     CD_Sistema: 'S',
     CD_Coligada: 5,
     TP_Entidade: TipoEntidade.RESPONSAVEL,
+    TP_Vinculo_Responsavel: 'ACADEMICO',
   },
   {
     NM_Perfil: 'RespFinanc_LFB',
     CD_Sistema: 'S',
     CD_Coligada: 5,
     TP_Entidade: TipoEntidade.RESPONSAVEL,
+    TP_Vinculo_Responsavel: 'FINANCEIRO',
+  },
+  {
+    NM_Perfil: 'RespAcad_LFB',
+    CD_Sistema: 'S',
+    CD_Coligada: 6,
+    TP_Entidade: TipoEntidade.RESPONSAVEL,
+    TP_Vinculo_Responsavel: 'ACADEMICO',
+  },
+  {
+    NM_Perfil: 'RespFinanc_LFB',
+    CD_Sistema: 'S',
+    CD_Coligada: 6,
+    TP_Entidade: TipoEntidade.RESPONSAVEL,
+    TP_Vinculo_Responsavel: 'FINANCEIRO',
   },
 ]

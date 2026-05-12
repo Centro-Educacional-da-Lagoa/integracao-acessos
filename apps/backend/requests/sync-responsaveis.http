@@ -1,3 +1,40 @@
+POST http://localhost:3000/sync/responsaveis
+
+###
+
+POST http://localhost:3000/sync/responsaveis/responsavel
+Content-Type: application/json
+
+{
+  "CD_Periodo_Letivo": "2026",
+  "CD_Pessoa": 123456,
+  "TP_Origem_Disparo": "REPROCESSAMENTO"
+}
+
+###
+
+POST http://localhost:3000/sync/responsaveis/responsavel
+Content-Type: application/json
+
+{
+  "CD_Periodo_Letivo": "2026",
+  "CD_CPF": "10240205766",
+  "TP_Origem_Disparo": "REPROCESSAMENTO"
+}
+
+###
+
+POST http://localhost:3000/sync/responsaveis/responsavel
+Content-Type: application/json
+
+{
+  "CD_Periodo_Letivo": "2026",
+  "CD_Registro_Academico": "2026100999",
+  "TP_Origem_Disparo": "WEBHOOK"
+}
+
+###
+
 POST http://localhost:3000/sync/responsaveis/cancelamentos
 
 ###
@@ -31,5 +68,6 @@ Content-Type: application/json
   "CD_Periodo_Letivo": "2026",
   "CD_Pessoa": 123456,
   "CD_CPF": "12345678901",
+  "CD_Registro_Academico": "2026100999",
   "TP_Origem_Disparo": "WEBHOOK"
 }

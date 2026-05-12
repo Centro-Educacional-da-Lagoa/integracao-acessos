@@ -6,6 +6,7 @@ import { FuncionarioTotvsDto } from './dto/funcionario-totvs.dto'
 import { AlunoTotvsDto } from './dto/aluno-totvs.dto'
 import { AlunoCancelamentoTotvsDto } from './dto/aluno-cancelamento-totvs.dto'
 import { ResponsavelCancelamentoTotvsDto } from './dto/responsavel-cancelamento-totvs.dto'
+import { ResponsavelAtivacaoTotvsDto } from './dto/responsavel-ativacao-totvs.dto'
 import { getTotvsTableName } from 'src/utils/get-table-corpore'
 import { totvsApiConstants } from './constants/totvs-api.constants'
 
@@ -58,6 +59,14 @@ export class TotvsService {
       this.logger.error(`${contexto} — TOTVS retornou erro lógico: ${detalhes}`)
       throw new Error(`TOTVS error: ${detalhes}`)
     }
+  }
+
+  private getTotvsFrameworkApiBaseUrl(): string {
+    const configuredUrl =
+      totvsApiConstants.urlAPI || totvsApiConstants.urlPortalAPI
+    const baseUrl = configuredUrl.replace(/\/+$/, '')
+
+    return baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`
   }
 
   // ─── Método legado (mantido para o fluxo de funcionários existente) ──────────
@@ -183,9 +192,7 @@ export class TotvsService {
     const periodoLetivoEscapado = CD_Periodo_Letivo.replace(/'/g, "''")
     const cdPessoaSql = this.toSqlNumberOrNull(CD_Pessoa)
     const cdCpfSql = this.toSqlStringOrNull(CD_CPF)
-    const cdRegistroAcademicoSql = this.toSqlStringOrNull(
-      CD_Registro_Academico,
-    )
+    const cdRegistroAcademicoSql = this.toSqlStringOrNull(CD_Registro_Academico)
 
     this.logger.log(
       `Buscando responsáveis para cancelamento — período ${CD_Periodo_Letivo}`,
@@ -205,6 +212,35 @@ export class TotvsService {
     return result
   }
 
+  async fetchResponsaveisAtivacao(
+    CD_Periodo_Letivo: string,
+    CD_Pessoa: number | null = null,
+    CD_CPF: string | null = null,
+    CD_Registro_Academico: string | null = null,
+  ): Promise<ResponsavelAtivacaoTotvsDto[]> {
+    const periodoLetivoEscapado = CD_Periodo_Letivo.replace(/'/g, "''")
+    const cdPessoaSql = this.toSqlNumberOrNull(CD_Pessoa)
+    const cdCpfSql = this.toSqlStringOrNull(CD_CPF)
+    const cdRegistroAcademicoSql = this.toSqlStringOrNull(CD_Registro_Academico)
+
+    this.logger.log(
+      `Buscando responsáveis para ativação — período ${CD_Periodo_Letivo}`,
+    )
+
+    const result = await this.prisma.$queryRawUnsafe<
+      ResponsavelAtivacaoTotvsDto[]
+    >(
+      `
+      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Responsavel_Ativacao_Acesso] '${periodoLetivoEscapado}', ${cdPessoaSql}, ${cdCpfSql}, ${cdRegistroAcademicoSql}`,
+    )
+
+    this.logger.log(
+      `Encontrados ${result.length} linha(s) de responsável para ativação`,
+    )
+
+    return result
+  }
+
   async fetchResponsavelCancelamento(
     CD_Periodo_Letivo: string,
     CD_Pessoa: number | null = null,
@@ -212,6 +248,22 @@ export class TotvsService {
     CD_Registro_Academico: string | null = null,
   ): Promise<ResponsavelCancelamentoTotvsDto | null> {
     const responsaveis = await this.fetchResponsaveisCancelamento(
+      CD_Periodo_Letivo,
+      CD_Pessoa,
+      CD_CPF,
+      CD_Registro_Academico,
+    )
+
+    return responsaveis[0] ?? null
+  }
+
+  async fetchResponsavelAtivacao(
+    CD_Periodo_Letivo: string,
+    CD_Pessoa: number | null = null,
+    CD_CPF: string | null = null,
+    CD_Registro_Academico: string | null = null,
+  ): Promise<ResponsavelAtivacaoTotvsDto | null> {
+    const responsaveis = await this.fetchResponsaveisAtivacao(
       CD_Periodo_Letivo,
       CD_Pessoa,
       CD_CPF,
@@ -1012,10 +1064,6 @@ export class TotvsService {
       ...dadosUsuarioSistema,
       GPERMIS: gpermisAtualizado,
     }
-    console.log(
-      '🚀 ~ TotvsService ~ atualizarPerfisUsuario ~ payload:',
-      JSON.stringify(payload, null, 2),
-    )
 
     try {
       const response = await axios({
@@ -1051,6 +1099,74 @@ export class TotvsService {
 
       this.logger.error('PAYLOAD:')
       this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error('------------------------------------')
+
+      return {
+        status: 'Error',
+        data:
+          axios.isAxiosError(error) && error.response
+            ? error.response.data
+            : (error as Error),
+      }
+    }
+  }
+
+  async removerPerfilUsuario(params: {
+    cdUsuario: string
+    cdColigada: number
+    codPerfil: string
+  }): Promise<TotvsApiResponse> {
+    const { cdUsuario, cdColigada, codPerfil } = params
+    const user = encodeURIComponent(cdUsuario)
+    const role = encodeURIComponent(codPerfil)
+    const url = `${this.getTotvsFrameworkApiBaseUrl()}/framework/v1/users/${user}/roles/company/${cdColigada}/role/${role}`
+
+    this.logger.log(
+      `[Perfis] Removendo perfil ${codPerfil} do usuário ${cdUsuario} na coligada ${cdColigada}`,
+    )
+
+    try {
+      const response = await axios({
+        method: 'delete',
+        url,
+        headers: {
+          Authorization: totvsApiConstants.authorization,
+          Accept: 'application/json',
+        },
+      })
+
+      this.handleTotvsResponse(
+        response,
+        `removerPerfilUsuario cdUsuario=${cdUsuario} coligada=${cdColigada} perfil=${codPerfil}`,
+      )
+
+      this.logger.log(
+        `[Perfis] Perfil ${codPerfil} removido do usuário ${cdUsuario} na coligada ${cdColigada}`,
+      )
+
+      return { status: 'Sucesso', data: response.data }
+    } catch (error: any) {
+      const status = axios.isAxiosError(error) ? error.response?.status : null
+
+      if (status === 404) {
+        this.logger.log(
+          `[Perfis] Perfil ${codPerfil} não encontrado para ${cdUsuario} na coligada ${cdColigada} — skip`,
+        )
+        return { status: 'Sucesso', data: null }
+      }
+
+      this.logger.error('------------------------------------')
+      this.logger.error(
+        `[Perfis] ERRO AO REMOVER PERFIL ${codPerfil} DO USUÁRIO ${cdUsuario}:`,
+      )
+
+      if (axios.isAxiosError(error)) {
+        this.logger.error(error.response?.data)
+      } else {
+        this.logger.error(error)
+      }
+
+      this.logger.error(`DELETE: ${url}`)
       this.logger.error('------------------------------------')
 
       return {

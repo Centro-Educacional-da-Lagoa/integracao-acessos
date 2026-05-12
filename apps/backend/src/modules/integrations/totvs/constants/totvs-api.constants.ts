@@ -8,6 +8,8 @@ export const totvsApiConstants = {
    */
   urlAPI: process.env.TOTVS_API_URL || '',
 
+  urlPortalAPI: process.env.TOTVS_API_PORTAL_URL || '',
+
   /**
    * Cabeçalho de autorização para requisições à API
    */
