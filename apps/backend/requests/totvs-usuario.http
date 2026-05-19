@@ -1,12 +1,12 @@
 ### Buscar usuário TOTVS pelo código (RA do aluno)
 ### Substitua o código no final da URL pelo RA desejado
-GET http://201.148.210.189:8052/rmsrestdataserver/rest/GlbUsuarioData/75311568062
+GET http://201.148.210.189:8052/rmsrestdataserver/rest/GlbUsuarioData/10240205766
 Authorization: Basic UG9ydGFsTWF0cmljdWxhSW50Oms4Szl5cnBINFpRVXZzVg==
 CODSISTEMA: S
 Content-Type: application/json
 
 ###
-PUT http://201.148.210.189:8052/rmsrestdataserver/rest/GlbUsuarioData/75311568062
+PATCH http://201.148.210.189:8052/rmsrestdataserver/rest/GlbUsuarioData/10240205766
 Authorization: Basic UG9ydGFsTWF0cmljdWxhSW50Oms4Szl5cnBINFpRVXZzVg==
 CODSISTEMA: S
 CODCOLIGADA: 1
@@ -14,16 +14,15 @@ Content-Type: application/json
 
 
 {
- 
- "id": "75311568062",
-    "CODUSUARIO": "75311568062",
-    "NOME": "RYAN CEL TESTE",
-    "STATUS": 1,
-    "DATAINICIO": "2026-03-20T00:00:00-03:00",
+   "input": [{ "id": "10240205766",
+    "CODUSUARIO": "10240205766",
+    "NOME": "ANDERSON FLAVIO DIAS AGUIAR",
+    "STATUS": 0,
+    "DATAINICIO": "2020-01-01T00:00:00-03:00",
     "DATAEXPIRACAO": null,
     "CONFIRMABTNOK": 1,
-    "SENHA": "#P=False#PT=None#WF=10#HT=SHA256#HA=Bcrypt#V=4.0.2.0#H=$2a$10$SmVqTwkArfIgRSzvIdO4Wu/4kv8up1AYaCJ.8L40RTpbDUk59JEE6",
-    "CONTROLE": -24445,
+    "SENHA": "#P=False#PT=None#WF=10#HT=SHA256#HA=Bcrypt#V=4.0.2.0#H=$2a$10$4uDx.zgPhcrtolSqIxZWweWvG0OBtkxNskeqf/uWT9VRfh66d1lWW",
+    "CONTROLE": 11349,
     "ULTIMACOLIGADA": null,
     "CODACESSO": "Acesso03",
     "DTAEXPSENHA": null,
@@ -31,100 +30,59 @@ Content-Type: application/json
     "OBRIGAALTERARSENHA": "F",
     "NUMLOGININVALIDO": null,
     "DATALOGININVALIDO": null,
-    "EMAIL": "2026100999@aluno.cel.g12.br",
-    "ACESSONET": "T",
-    "DATAULTIMOACESSO": null,
-    "CODUSUARIOREDE": null,
-    "DOMINIOREDE": null,
-    "LIVEID": null,
-    "USUARIOTWITTER": null,
-    "SENHATWITTER": null,
-    "USUARIOFACEBOOK": null,
-    "SENHAFACEBOOK": null,
-    "USUARIOLINKEDIN": null,
-    "SENHALINKEDIN": null,
-    "FULLDETERMINED": "",
-    "USERID": "6f6bc038-d845-494b-9213-4f0c3690428b",
-    "INTEGRADOFLUIG": null,
-    "USERIDFLUIGIDENTITY": null,
-    "IGNORARAUTENTICACAOLDAP": "F",
-    "NOMESOCIAL": null,
-    "DATAULTIMOACESSOVALIDO": null,
-    "CODEXTERNO": null,
-    "ULTIMASSENHAS": null,
-    "INTERNO1": null,
-    "RECCREATEDON": "2026-03-20T15:29:14-03:00",
-    "RECMODIFIEDON": "2026-03-30T14:45:20-03:00",
-    "RECCREATEDBY": "PortalMatriculaInt",
-    "RECMODIFIEDBY": "PortalMatriculaInt",
     "GPERMIS": [
- {
-        "id": "1$_$S$_$75311568062",
-        "parent_id": "75311568062",
+      {
+        "id": "1$_$S$_$10240205766",
+        "parent_id": "10240205766",
         "CODCOLIGADA": 1,
         "CODSISTEMA": "S",
-        "CODUSUARIO": "75311568062",
+        "CODUSUARIO": "10240205766",
         "SUPERVISOR": 0,
-        "CONTROLE": 25752,
+        "CONTROLE": 10326,
         "CRIARELAT": 0,
         "RECCREATEDBY": "PortalMatriculaInt",
-        "RECCREATEDON": "2026-03-20T15:29:17-03:00",
+        "RECCREATEDON": "2024-06-26T16:35:55-03:00",
         "RECMODIFIEDBY": "PortalMatriculaInt",
-        "RECMODIFIEDON": "2026-03-30T15:09:54-03:00",
+        "RECMODIFIEDON": "2026-05-06T14:05:45-03:00",
         "GUSRPERFIL": [
           {
-            "id": "1$_$75311568062$_$S$_$Aluno CEL",
-            "parent_id": "1$_$S$_$75311568062",
+            "id": "1$_$10240205766$_$S$_$RespAcad_CEL",
+            "parent_id": "1$_$S$_$10240205766",
             "CODCOLIGADA": 1,
-            "CODUSUARIO": "75311568062",
+            "CODUSUARIO": "10240205766",
             "CODSISTEMA": "S",
-            "CODPERFIL": "Aluno CEL",
+            "CODPERFIL": "RespAcad_CEL",
             "INDICE": 0,
-            "CONTROLE": 7228,
+            "CONTROLE": -28979,
+            "RECCREATEDBY": "pedro",
+            "RECCREATEDON": "2024-07-01T12:30:15-03:00",
+            "RECMODIFIEDBY": "PortalMatriculaInt",
+            "RECMODIFIEDON": "2026-05-06T14:05:45-03:00",
+            "STATUS": 1,
+            "IDPERFIL": "RespAcad_CEL"
+          },
+          {
+            "id": "1$_$10240205766$_$S$_$RespFinanc_CEL",
+            "parent_id": "1$_$S$_$10240205766",
+            "CODCOLIGADA": 1,
+            "CODUSUARIO": "10240205766",
+            "CODSISTEMA": "S",
+            "CODPERFIL": "RespFinanc_CEL",
+            "INDICE": 0,
+            "CONTROLE": 32110,
             "RECCREATEDBY": "PortalMatriculaInt",
-            "RECCREATEDON": "2026-03-30T15:08:43-03:00",
+            "RECCREATEDON": "2024-06-26T16:35:55-03:00",
             "RECMODIFIEDBY": "PortalMatriculaInt",
-            "RECMODIFIEDON": "2026-03-30T15:09:54-03:00",
-            "STATUS": 1,
-            "IDPERFIL": "Aluno CEL_S"
-          },
-          {
-            "id": "1$_$75311568062$_$S$_$Aluno CEL 2",
-            "parent_id": "1$_$S$_$75311568062",
-            "CODCOLIGADA": 1,
-            "CODUSUARIO": "75311568062",
-            "CODSISTEMA": "S",
-            "CODPERFIL": "Aluno CEL 2",
-            "INDICE": 0,
-            "CONTROLE": -14662,
-            "RECCREATEDBY": "19799694779",
-            "RECCREATEDON": "2026-03-30T14:45:15-03:00",
-            "RECMODIFIEDBY": "PortalMatriculaInt",
-            "RECMODIFIEDON": "2026-03-30T15:09:54-03:00",
-            "STATUS": 1,
-            "IDPERFIL": "Aluno CEL 2"
-          },
-          {
-            "id": "1$_$75311568062$_$S$_$Coordenação",
-            "parent_id": "1$_$S$_$75311568062",
-            "CODCOLIGADA": 1,
-            "CODUSUARIO": "75311568062",
-            "CODSISTEMA": "S",
-            "CODPERFIL": "Coordenação",
-            "INDICE": 0,
-            "CONTROLE": -23095,
-            "RECCREATEDBY": "19799694779",
-            "RECCREATEDON": "2026-03-20T15:32:16-03:00",
-            "RECMODIFIEDBY": "PortalMatriculaInt",
-            "RECMODIFIEDON": "2026-03-30T15:09:54-03:00",
-            "STATUS": 1,
-            "IDPERFIL": "Coordenação CEL"
+            "RECMODIFIEDON": "2026-05-08T08:04:05-03:00",
+            "STATUS": 0,
+            "IDPERFIL": "RespFinanc_CEL"
           }
         ]
       }
     ]
-
+  }]
 }
+
 
 
 ###
