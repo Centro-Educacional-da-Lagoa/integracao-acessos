@@ -5,3 +5,12 @@ apps/backend/dist
 .codex
 tmp
 *.log
+.env
+apps/backend/.env
+
+# Arquivos de configuração do ambiente de desenvolvimento
+.env
+.env.example
+.env.local
+.env.development
+.env.test
