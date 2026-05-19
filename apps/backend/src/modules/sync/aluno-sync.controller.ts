@@ -11,6 +11,7 @@ import { AlunoSyncService } from './aluno-sync.service'
 import { CancelamentoAlunoSchema } from './dto/aluno-cancelamento.dto'
 import { WebhookAlunoSchema } from './dto/aluno-webhook.dto'
 import { ZodError } from 'zod'
+import { Public } from '../../common/decorators/public.decorator'
 
 @Controller()
 export class AlunoSyncController {
@@ -73,6 +74,7 @@ export class AlunoSyncController {
   }
 
   @Post('webhooks/alunos')
+  @Public()
   @HttpCode(HttpStatus.ACCEPTED)
   async triggerWebhookAluno(
     @Body() body: unknown,
