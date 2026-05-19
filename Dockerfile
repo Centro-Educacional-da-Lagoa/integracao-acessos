@@ -8,11 +8,11 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/backend/package.json apps/backend/package.json
 COPY apps/backend/prisma/schema.prisma apps/backend/prisma/schema.prisma
 
-RUN npm install -g pnpm
+RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 
 COPY . .
 
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 
 RUN pnpm --filter backend exec prisma generate --schema=prisma/schema.prisma
 

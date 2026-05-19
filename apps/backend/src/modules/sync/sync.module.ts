@@ -10,7 +10,6 @@ import { ResponsavelSyncService } from './responsavel-sync.service'
 import { ResponsavelSyncCron } from './responsavel-sync.cron'
 import { TotvsModule } from '../integrations/totvs/totvs.module'
 import { GoogleModule } from '../integrations/google/google.module'
-import { PrismaService } from '../../core/prisma/prisma.service'
 import { AppLoggerModule } from '../../core/logger/logger.module'
 import { AccessProvisioningModule } from './access-provisioning/access-provisioning.module'
 
@@ -42,7 +41,6 @@ import { AccessProvisioningModule } from './access-provisioning/access-provision
     ResponsavelSyncService,
     ResponsavelSyncCron,
     ResponsavelSyncProcessor,
-    PrismaService,
   ],
 })
 export class SyncModule {}
