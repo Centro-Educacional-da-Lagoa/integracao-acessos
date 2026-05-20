@@ -8,6 +8,7 @@ import { AccessProvisioningService } from './access-provisioning/access-provisio
 import { PessoaAcessoContext } from './access-provisioning/interfaces/pessoa-acesso-context.interface'
 import { AlunoTotvsDto } from '../integrations/totvs/dto/aluno-totvs.dto'
 import { AlunoCancelamentoTotvsDto } from '../integrations/totvs/dto/aluno-cancelamento-totvs.dto'
+import { ResponsavelSyncService } from './responsavel-sync.service'
 
 export interface ColigadaSyncJobData {
   periodoLetivo: string
@@ -49,6 +50,7 @@ export class AlunoSyncProcessor {
     private readonly totvsService: TotvsService,
     private readonly googleService: GoogleService,
     private readonly accessProvisioningService: AccessProvisioningService,
+    private readonly responsavelSyncService: ResponsavelSyncService,
   ) {}
 
   /**
@@ -169,6 +171,22 @@ export class AlunoSyncProcessor {
     }
 
     await this.syncAluno(alunoAtivo, coligada)
+
+    this.logger.log(
+      `[Job ${job.id}] [Webhook] Enfileirando responsáveis após reconciliação do aluno ${CD_Registro_Academico}`,
+    )
+
+    await this.responsavelSyncService.syncCancelamentoResponsavel({
+      CD_Periodo_Letivo,
+      CD_Registro_Academico,
+      TP_Origem_Disparo: 'WEBHOOK',
+    })
+
+    await this.responsavelSyncService.syncResponsavel({
+      CD_Periodo_Letivo,
+      CD_Registro_Academico,
+      TP_Origem_Disparo: 'WEBHOOK',
+    })
 
     this.logger.log(
       `[Job ${job.id}] [Webhook] Processamento concluído para aluno ${CD_Registro_Academico}`,

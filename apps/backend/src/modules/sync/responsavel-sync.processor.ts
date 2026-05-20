@@ -1,6 +1,6 @@
 import { InjectQueue, Process, Processor } from '@nestjs/bull'
 import { Logger } from '@nestjs/common'
-import { Job, Queue } from 'bull'
+import { Job, JobOptions, Queue } from 'bull'
 import { TotvsService } from '../integrations/totvs/totvs.service'
 import { AccessProvisioningService } from './access-provisioning/access-provisioning.service'
 import { PessoaAcessoContext } from './access-provisioning/interfaces/pessoa-acesso-context.interface'
@@ -58,6 +58,35 @@ export class ResponsavelSyncProcessor {
     private readonly totvsService: TotvsService,
     private readonly accessProvisioningService: AccessProvisioningService,
   ) {}
+
+  private async addResponsavelProcessorJob<T>(
+    name: string,
+    data: T,
+    options: JobOptions,
+  ): Promise<Job<T>> {
+    if (!options.jobId) {
+      return this.responsavelSyncQueue.add(name, data, options)
+    }
+
+    const existingJob = await this.responsavelSyncQueue.getJob(options.jobId)
+    if (existingJob) {
+      const state = await existingJob.getState()
+
+      if (state === 'completed' || state === 'failed') {
+        await existingJob.remove()
+        this.logger.debug(
+          `Removendo job terminal ${options.jobId} (${state}) antes de reenfileirar`,
+        )
+      } else {
+        this.logger.warn(
+          `Job ${options.jobId} já existe em estado ${state}; mantendo deduplicação`,
+        )
+        return existingJob as Job<T>
+      }
+    }
+
+    return this.responsavelSyncQueue.add(name, data, options)
+  }
 
   private buildResponsavelJobKey(data: {
     tipo: 'sync-responsavel-unitario' | 'cancelamento-responsavel-unitario'
@@ -160,7 +189,7 @@ export class ResponsavelSyncProcessor {
       [...grupos.values()].map((grupo) => {
         const representativo = grupo[0]
 
-        return this.responsavelSyncQueue.add(
+        return this.addResponsavelProcessorJob(
           'cancelamento-responsavel-unitario',
           {
             CD_Periodo_Letivo,
@@ -212,7 +241,7 @@ export class ResponsavelSyncProcessor {
       [...grupos.values()].map((grupo) => {
         const representativo = grupo[0]
 
-        return this.responsavelSyncQueue.add(
+        return this.addResponsavelProcessorJob(
           'sync-responsavel-unitario',
           {
             CD_Periodo_Letivo,

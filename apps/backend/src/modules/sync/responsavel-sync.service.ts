@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import { InjectQueue } from '@nestjs/bull'
-import { Queue } from 'bull'
+import { Job, JobOptions, Queue } from 'bull'
 import {
   AtivacaoResponsavelLoteJobData,
   AtivacaoResponsavelUnitarioJobData,
@@ -17,6 +17,35 @@ export class ResponsavelSyncService {
     @InjectQueue('responsavel-sync')
     private readonly responsavelSyncQueue: Queue,
   ) {}
+
+  private async addResponsavelSyncJob<T>(
+    name: string,
+    data: T,
+    options: JobOptions,
+  ): Promise<Job<T>> {
+    if (!options.jobId) {
+      return this.responsavelSyncQueue.add(name, data, options)
+    }
+
+    const existingJob = await this.responsavelSyncQueue.getJob(options.jobId)
+    if (existingJob) {
+      const state = await existingJob.getState()
+
+      if (state === 'completed' || state === 'failed') {
+        await existingJob.remove()
+        this.logger.debug(
+          `Removendo job terminal ${options.jobId} (${state}) antes de reenfileirar`,
+        )
+      } else {
+        this.logger.warn(
+          `Job ${options.jobId} já existe em estado ${state}; mantendo deduplicação`,
+        )
+        return existingJob as Job<T>
+      }
+    }
+
+    return this.responsavelSyncQueue.add(name, data, options)
+  }
 
   private buildResponsavelAtivacaoUnitarioJobId(data: {
     CD_Periodo_Letivo: string
@@ -116,7 +145,7 @@ export class ResponsavelSyncService {
       )
     }
 
-    const job = await this.responsavelSyncQueue.add(
+    const job = await this.addResponsavelSyncJob(
       'sync-responsavel-unitario',
       {
         CD_Periodo_Letivo: data.CD_Periodo_Letivo,
@@ -210,7 +239,7 @@ export class ResponsavelSyncService {
       )
     }
 
-    const job = await this.responsavelSyncQueue.add(
+    const job = await this.addResponsavelSyncJob(
       'cancelamento-responsavel-unitario',
       {
         CD_Periodo_Letivo: data.CD_Periodo_Letivo,
