@@ -484,6 +484,11 @@ export class AccessProvisioningService {
       return
     }
 
+    if (!ctx.IN_Funcionario && !ctx.IN_Responsavel) {
+      await this._sincronizarUsuarioFilialAluno(ctx, cdUsuario)
+      return
+    }
+
     if (ctx.CD_Filial === null || ctx.CD_Filial === undefined) {
       this.logger.warn(
         `[UsuarioFilial] CD_Filial ausente para usuário ${cdUsuario} na coligada ${ctx.CD_Coligada} — etapa ignorada`,
@@ -501,6 +506,40 @@ export class AccessProvisioningService {
     if (result.status === 'Error') {
       this.logger.warn(
         `[UsuarioFilial] Falha ao garantir acesso usuário-filial para ${cdUsuario} (coligada ${ctx.CD_Coligada}, filial ${ctx.CD_Filial})`,
+      )
+    }
+  }
+
+  private async _sincronizarUsuarioFilialAluno(
+    ctx: PessoaAcessoContext,
+    cdUsuario: string,
+  ): Promise<void> {
+    if (ctx.CD_Filial === null || ctx.CD_Filial === undefined) {
+      this.logger.warn(
+        `[UsuarioFilial][Aluno] CD_Filial ausente para usuário ${cdUsuario} na coligada ${ctx.CD_Coligada} — etapa ignorada`,
+      )
+      return
+    }
+
+    const alocacoes = [
+      {
+        CD_Coligada: ctx.CD_Coligada,
+        CD_Filial: ctx.CD_Filial,
+      },
+    ]
+
+    await this._revogarUsuarioFilialForaDasAlocacoes(cdUsuario, alocacoes)
+
+    const result = await this.totvsService.garantirUsuarioFilial({
+      cdColigada: ctx.CD_Coligada,
+      cdFilial: ctx.CD_Filial,
+      cdUsuario,
+      inFuncionario: 0,
+    })
+
+    if (result.status === 'Error') {
+      this.logger.warn(
+        `[UsuarioFilial][Aluno] Falha ao garantir acesso usuário-filial para ${cdUsuario} (coligada ${ctx.CD_Coligada}, filial ${ctx.CD_Filial})`,
       )
     }
   }
