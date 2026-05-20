@@ -11,11 +11,44 @@ import {
 @Injectable()
 export class ResponsavelSyncService {
   private readonly logger = new Logger(ResponsavelSyncService.name)
+  private static readonly REMOVE_ON_COMPLETE = 1000
 
   constructor(
     @InjectQueue('responsavel-sync')
     private readonly responsavelSyncQueue: Queue,
   ) {}
+
+  private buildResponsavelAtivacaoUnitarioJobId(data: {
+    CD_Periodo_Letivo: string
+    TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' | 'WEBHOOK'
+    CD_Pessoa?: number | null
+    CD_CPF?: string | null
+    CD_Registro_Academico?: string | null
+  }): string {
+    return [
+      'sync-responsavel-unitario',
+      data.TP_Origem_Disparo,
+      data.CD_Periodo_Letivo,
+      data.CD_CPF ?? `P${data.CD_Pessoa ?? 'NULL'}`,
+      data.CD_Registro_Academico ?? 'ALL',
+    ].join(':')
+  }
+
+  private buildResponsavelCancelamentoUnitarioJobId(data: {
+    CD_Periodo_Letivo: string
+    TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' | 'WEBHOOK'
+    CD_Pessoa?: number | null
+    CD_CPF?: string | null
+    CD_Registro_Academico?: string | null
+  }): string {
+    return [
+      'cancelamento-responsavel-unitario',
+      data.TP_Origem_Disparo,
+      data.CD_Periodo_Letivo,
+      data.CD_CPF ?? `P${data.CD_Pessoa ?? 'NULL'}`,
+      data.CD_Registro_Academico ?? 'ALL',
+    ].join(':')
+  }
 
   async syncResponsaveis(): Promise<void> {
     const CD_Periodo_Letivo = process.env.PERIODO_LETIVO
@@ -95,6 +128,14 @@ export class ResponsavelSyncService {
       {
         attempts: 3,
         backoff: { type: 'exponential', delay: 2000 },
+        jobId: this.buildResponsavelAtivacaoUnitarioJobId({
+          CD_Periodo_Letivo: data.CD_Periodo_Letivo,
+          TP_Origem_Disparo: data.TP_Origem_Disparo,
+          CD_Pessoa: data.CD_Pessoa ?? null,
+          CD_CPF: data.CD_CPF ?? null,
+          CD_Registro_Academico: data.CD_Registro_Academico ?? null,
+        }),
+        removeOnComplete: ResponsavelSyncService.REMOVE_ON_COMPLETE,
       },
     )
 
@@ -181,6 +222,14 @@ export class ResponsavelSyncService {
       {
         attempts: 3,
         backoff: { type: 'exponential', delay: 2000 },
+        jobId: this.buildResponsavelCancelamentoUnitarioJobId({
+          CD_Periodo_Letivo: data.CD_Periodo_Letivo,
+          TP_Origem_Disparo: data.TP_Origem_Disparo,
+          CD_Pessoa: data.CD_Pessoa ?? null,
+          CD_CPF: data.CD_CPF ?? null,
+          CD_Registro_Academico: data.CD_Registro_Academico ?? null,
+        }),
+        removeOnComplete: ResponsavelSyncService.REMOVE_ON_COMPLETE,
       },
     )
 

@@ -20,11 +20,40 @@ import { ResponsavelSyncService } from './responsavel-sync.service'
 export class AlunoSyncService {
   private readonly logger = new Logger(AlunoSyncService.name)
   private static readonly COLIGADAS_BLOQUEADAS_PROCEDURE = new Set([6])
+  private static readonly REMOVE_ON_COMPLETE = 1000
 
   constructor(
     @InjectQueue('aluno-sync') private readonly alunoSyncQueue: Queue,
     private readonly responsavelSyncService: ResponsavelSyncService,
   ) {}
+
+  private buildAlunoWebhookJobId(data: {
+    CD_Periodo_Letivo: string
+    CD_Coligada: number
+    CD_Registro_Academico: string
+  }): string {
+    return [
+      'webhook-aluno',
+      data.CD_Periodo_Letivo,
+      data.CD_Coligada,
+      data.CD_Registro_Academico,
+    ].join(':')
+  }
+
+  private buildAlunoCancelamentoJobId(data: {
+    CD_Periodo_Letivo: string
+    CD_Coligada: number
+    CD_Registro_Academico: string
+    TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' | 'WEBHOOK'
+  }): string {
+    return [
+      'cancelamento-aluno',
+      data.TP_Origem_Disparo,
+      data.CD_Periodo_Letivo,
+      data.CD_Coligada,
+      data.CD_Registro_Academico,
+    ].join(':')
+  }
 
   /**
    * Adiciona jobs na fila para sincronizar alunos de todas as coligadas (um job por coligada)
@@ -252,6 +281,13 @@ export class AlunoSyncService {
           type: 'exponential',
           delay: 2000,
         },
+        jobId: this.buildAlunoCancelamentoJobId({
+          CD_Periodo_Letivo: data.CD_Periodo_Letivo,
+          CD_Coligada: data.CD_Coligada,
+          CD_Registro_Academico: data.CD_Registro_Academico,
+          TP_Origem_Disparo: data.TP_Origem_Disparo,
+        }),
+        removeOnComplete: AlunoSyncService.REMOVE_ON_COMPLETE,
       },
     )
 
@@ -294,6 +330,12 @@ export class AlunoSyncService {
           type: 'exponential',
           delay: 2000,
         },
+        jobId: this.buildAlunoWebhookJobId({
+          CD_Periodo_Letivo,
+          CD_Coligada: coligada.id,
+          CD_Registro_Academico: data.CD_Registro_Academico,
+        }),
+        removeOnComplete: AlunoSyncService.REMOVE_ON_COMPLETE,
       },
     )
 

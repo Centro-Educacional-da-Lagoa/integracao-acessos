@@ -50,6 +50,7 @@ export interface AtivacaoResponsavelUnitarioJobData {
 @Processor('responsavel-sync')
 export class ResponsavelSyncProcessor {
   private readonly logger = new Logger(ResponsavelSyncProcessor.name)
+  private static readonly REMOVE_ON_COMPLETE = 1000
 
   constructor(
     @InjectQueue('responsavel-sync')
@@ -57,6 +58,23 @@ export class ResponsavelSyncProcessor {
     private readonly totvsService: TotvsService,
     private readonly accessProvisioningService: AccessProvisioningService,
   ) {}
+
+  private buildResponsavelJobKey(data: {
+    tipo: 'sync-responsavel-unitario' | 'cancelamento-responsavel-unitario'
+    CD_Periodo_Letivo: string
+    TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' | 'WEBHOOK'
+    CD_Pessoa: number | null
+    CD_CPF: string | null
+    CD_Registro_Academico?: string | null
+  }): string {
+    return [
+      data.tipo,
+      data.TP_Origem_Disparo,
+      data.CD_Periodo_Letivo,
+      data.CD_CPF ?? `P${data.CD_Pessoa ?? 'NULL'}`,
+      data.CD_Registro_Academico ?? 'ALL',
+    ].join(':')
+  }
 
   @Process('cancelamentos-responsavel')
   async handleCancelamentosResponsavel(
@@ -154,6 +172,15 @@ export class ResponsavelSyncProcessor {
           {
             attempts: 3,
             backoff: { type: 'exponential', delay: 2000 },
+            jobId: this.buildResponsavelJobKey({
+              tipo: 'cancelamento-responsavel-unitario',
+              CD_Periodo_Letivo,
+              TP_Origem_Disparo,
+              CD_Pessoa: this.parsePessoa(representativo.CD_Pessoa),
+              CD_CPF: representativo.CD_CPF ?? null,
+              CD_Registro_Academico: null,
+            }),
+            removeOnComplete: ResponsavelSyncProcessor.REMOVE_ON_COMPLETE,
           },
         )
       }),
@@ -198,6 +225,15 @@ export class ResponsavelSyncProcessor {
           {
             attempts: 3,
             backoff: { type: 'exponential', delay: 2000 },
+            jobId: this.buildResponsavelJobKey({
+              tipo: 'sync-responsavel-unitario',
+              CD_Periodo_Letivo,
+              TP_Origem_Disparo,
+              CD_Pessoa: this.parsePessoa(representativo.CD_Pessoa),
+              CD_CPF: representativo.CD_CPF ?? null,
+              CD_Registro_Academico: null,
+            }),
+            removeOnComplete: ResponsavelSyncProcessor.REMOVE_ON_COMPLETE,
           },
         )
       }),
