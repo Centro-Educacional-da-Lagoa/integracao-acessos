@@ -196,8 +196,8 @@ BEGIN
 					end
 				, tmp.IN_Inativo_Extra =
 					case
-						when isnull(cex.QT_Matricula_Extra, 0) > 0 then 1
-						else 0
+						when isnull(cex.QT_Matricula_Extra, 0) > 0 then 0
+						else 1
 					end
 		from	#tmp_aluno_ativo						as tmp
 		left	join #tmp_cex							as cex
@@ -254,7 +254,7 @@ BEGIN
 					end
 				, tmp.IN_Inativo_Extra =
 					case
-						when isnull(cex.QT_Matricula_Extra, 0) > 0 then 1
+						when isnull(cex.QT_Matricula_Extra, 0) > 0 then 0
 						else 0
 					end
 		from	#tmp_aluno_ativo						as tmp
