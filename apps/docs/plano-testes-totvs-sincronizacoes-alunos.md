@@ -1,198 +1,44 @@
-# Playbook de Homologacao - Sincronizacoes de Alunos (Ativacao e Cancelamento)
+# Plano de Testes via Webhook - Integração de Alunos
 
 ## Objetivo
-Este documento serve para o analista simular situacoes no TOTVS, rodar a integracao e validar se o resultado ficou correto no TOTVS e no Google.
 
-Formato de uso:
-1. Simular a situacao no TOTVS (ou localizar um aluno real com as flags desejadas).
-2. Rodar a integracao (ativacao ou cancelamento).
-3. Conferir os resultados esperados em TOTVS e Google.
+Executar testes criando a situação no TOTVS, aguardando o processamento do webhook e validando o estado final no TOTVS.
 
----
+## Regras Fechadas
 
-## 1) Ativacao - Mapa de Situacoes
+- aluno regular ativo e puro pode ter Gmail criado ou reativado;
+- matrícula extra ativa não cria nem reativa Gmail por si só;
+- matrícula extra ativa mantém regras de usuário TOTVS;
+- cancelamento apenas de matrícula extra não suspende Gmail;
+- aluno com vínculo funcionário ou responsável usa CPF como login correto;
+- webhook reconcilia cancelamento e ativação do aluno.
 
-### A-01: Aluno ativo no regular, nao funcionario, nao responsavel
-- **Como simular (flags no retorno de ativacao)**:
-  - `IN_Existe_Matricula_Regular=1`
-  - `IN_Inativo_Regular=0`
-  - `IN_Funcionario=0`
-  - `IN_Responsavel=0`
-- **Ao rodar**: `POST /sync/alunos`
-- **Esperado Google**:
-  - Conta `${RA}@dominio_coligada` deve existir e ficar ativa (cria ou reativa).
-- **Esperado TOTVS**:
-  - `PPESSOA.EMAIL` = email institucional (se estava diferente).
-  - Usuario correto deve ficar vinculado na pessoa (`PPESSOA.CODUSUARIO`).
-  - Usuario TOTVS correto deve estar ativo (`STATUS=1`).
-  - Perfis de aluno concedidos:
-    - coligada 1: `Aluno CEL` nos sistemas `S` e `L`
-    - coligada 5: `Aluno LICEU` nos sistemas `S` e `L`
+## Observações do Core
 
-### A-02: Aluno ativo no regular, mas ja com email correto
-- **Como simular**:
-  - Mesmo de A-01
-  - `TX_Email_Pessoa` ja igual ao email institucional
-- **Esperado**:
-  - Nao alterar `PPESSOA.EMAIL`
-  - Demais regras de usuario/perfil seguem normalmente
+- para aluno puro, a ativação passa a garantir a filial do registro atual e revogar filiais excedentes já ativas do usuário, mantendo apenas a alocação do próprio aluno no contexto processado;
+- no TOTVS, `SUSUARIOFILIAL.ACESSO=1` corresponde a `Portal` e `SUSUARIOFILIAL.ACESSO=2` corresponde a `Sistema/PGE e Portal`;
+- os perfis de aluno mapeados no core são:
+  - coligada `1`: `Aluno CEL` nos sistemas `S` e `L`;
+  - coligada `5`: `Aluno LICEU` nos sistemas `S` e `L`;
+- no webhook de aluno, a trilha de responsável também é disparada depois do job do aluno; por isso, cenários com aluno que também é responsável podem receber complementos de acesso pela integração de responsável.
 
-### A-03: Aluno com `CD_Usuario` nulo (sem usuario vinculado)
-- **Como simular**:
-  - `CD_Usuario=null`
-  - Elegivel ou nao para Google (tanto faz para esta validacao)
-- **Esperado TOTVS**:
-  - Se usuario correto nao existir: criar usuario
-  - Se existir inativo: reativar
-  - Em ambos: vincular pessoa ao usuario correto
-  - Garantir perfis faltantes
+## Matriz Consolidada
 
-### A-04: Aluno com `CD_Usuario` incorreto (troca de login)
-- **Como simular**:
-  - `CD_Usuario` diferente do login correto
-  - Login correto:
-    - aluno puro: `RA`
-    - funcionario/responsavel: `CPF`
-- **Esperado TOTVS**:
-  - Criar/reativar usuario correto
-  - Vincular pessoa ao usuario correto
-  - Tentar inativar usuario antigo
-  - Transferir/garantir perfis conforme papeis ativos
-
-### A-05: Aluno tambem funcionario ou responsavel
-- **Como simular**:
-  - `IN_Funcionario=1` ou `IN_Responsavel=1`
-- **Esperado Google**:
-  - Nao provisionar Gmail institucional de aluno por este fluxo
-- **Esperado TOTVS**:
-  - Nao atualizar `PPESSOA.EMAIL` pela regra de aluno regular
-  - Login correto passa a ser `CPF` (na garantia de usuario)
-  - Perfis sao tratados conforme papeis ativos
-
-### A-06: Aluno da coligada 6
-- **Como simular**:
-  - `CD_Coligada=6`
-- **Esperado**:
-  - Dominio institucional usado: `aluno.lfb.g12.br`
-  - Validar que nao ha perfil de aluno mapeado na constante atual para coligada 6 (comportamento atual do codigo)
-
----
-
-## 2) Cancelamento - Mapa de Situacoes
-
-### C-01: Aluno elegivel para cancelamento total (inativar usuario)
-- **Como simular (flags no retorno de cancelamento)**:
-  - `IN_Inativo_Regular=1`
-  - `IN_Inativo_Extra=1`
-  - `CD_Usuario` preenchido
-  - `IN_Usuario_Ativo=1`
-  - `IN_Funcionario=0`
-  - `IN_Responsavel=0`
-- **Ao rodar**:
-  - Lote: `POST /sync/alunos/cancelamentos`
-  - Unitario: `POST /sync/alunos/cancelamentos/aluno`
-- **Esperado Google**:
-  - Conta institucional deve ser suspensa quando aplicavel
-- **Esperado TOTVS**:
-  - Usuario TOTVS deve ficar inativo (`STATUS=0`)
-  - Nao precisa remover perfis neste caminho (retorna apos inativar)
-
-### C-02: Aluno elegivel, mas sem `CD_Usuario`
-- **Como simular**:
-  - `IN_Inativo_Regular=1` ou `IN_Inativo_Extra=1`
-  - `CD_Usuario=null`
-- **Esperado**:
-  - Pode executar parte de Gmail (se regra permitir)
-  - Nao inativar usuario TOTVS
-  - Nao remover perfil (nao ha usuario vinculado)
-
-### C-03: Aluno elegivel, com vinculo funcionario/responsavel
-- **Como simular**:
-  - `IN_Inativo_Regular=1`
-  - `IN_Inativo_Extra=1`
-  - `CD_Usuario` preenchido
-  - `IN_Funcionario=1` ou `IN_Responsavel=1`
-- **Esperado TOTVS**:
-  - Nao inativar usuario
-  - Remover apenas perfis de aluno (manter usuario para outros papeis)
-
-### C-04: Aluno nao elegivel para cancelamento
-- **Como simular**:
-  - `IN_Inativo_Regular=0` e `IN_Inativo_Extra=0`
-- **Esperado**:
-  - Sem alteracoes em usuario/perfis no TOTVS
-  - Fluxo deve registrar skip
-
-### C-05: Usuario ja inativo, mas perfis de aluno ainda presentes
-- **Como simular**:
-  - `IN_Inativo_Regular=1`
-  - `IN_Inativo_Extra=1`
-  - `CD_Usuario` preenchido
-  - `IN_Usuario_Ativo=0`
-- **Esperado TOTVS**:
-  - Nao inativar novamente
-  - Remover perfis de aluno se ainda existirem
-
----
-
-## 3) Como validar no TOTVS e Google (checklist por registro)
-
-Para cada aluno testado, coletar antes/depois:
-
-### TOTVS
-- `PPESSOA`:
-  - `EMAIL`
-  - `CODUSUARIO`
-- `GUSUARIO` / `GlbUsuarioData`:
-  - `CODUSUARIO`
-  - `STATUS`
-  - `EMAIL`
-- `GPERMIS / GUSRPERFIL`:
-  - perfis de aluno esperados/removidos por sistema (`S`, `L`) e coligada
-
-### Google
-- Conta `${RA}@dominio_coligada`:
-  - existe?
-  - ativa ou suspensa?
-
-### Aplicacao
-- Log do job com:
-  - `job.id`
-  - `CD_Coligada`
-  - `CD_Registro_Academico`
-  - acao executada (create/activate/suspend/update/inactivate/remove profile/skip)
-
----
-
-## 4) Cenarios de Idempotencia (obrigatorio testar)
-
-### I-01: Rodar ativacao duas vezes para o mesmo aluno
-- **Esperado**: nao duplicar usuario/perfil; estado final permanece correto.
-
-### I-02: Rodar cancelamento duas vezes para o mesmo aluno
-- **Esperado**: sem erro funcional; usuario/perfis permanecem no estado final esperado.
-
-### I-03: Reprocessamento unitario de aluno ja processado
-- **Esperado**: fluxo deve ser seguro e manter consistencia.
-
-### I-04: Conta Google inexistente no cancelamento
-- **Esperado**: fluxo nao quebrar; seguir com validacoes TOTVS.
-
-### I-05: Aluno nao encontrado no fetch unitario de cancelamento
-- **Esperado**: warning e encerramento sem alteracao.
-
----
-
-## 5) Observacoes Importantes para Homologacao
-- Coligada 5 possui regra especial com curso extra em coligada 6 (validar por `CD_Pessoa`).
-- Coligada 6 usa dominio de email, mas atualmente nao possui perfis de aluno mapeados na constante local.
-- Existem pontos de risco nas procedures (join/flags/comentario vs filtro) que devem ser observados nos casos de borda.
-
----
-
-## 6) Roteiro Rapido de Execucao (ordem sugerida)
-1. Executar A-01, A-03, A-04 (cobre principal de ativacao).
-2. Executar A-05 e A-06 (papeis e coligadas especiais).
-3. Executar C-01, C-02, C-03, C-04, C-05 (cobre toda arvore de cancelamento).
-4. Executar I-01 a I-05 (idempotencia/reprocessamento).
-5. Consolidar evidencias antes/depois por aluno.
+| ID   | Situação                                                                               | O que a integração faz                                                                                                                                                                                                                                    | Tipos de acesso dados                                                                                                                                                     | Validar TOTVS após integração                                                                                                                                 | Validar Google                                                         | Responsável | Teste Realizado |
+| ---- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------- | --------------- |
+| T-01 | Aluno ativo regular, não é responsável nem funcionário                                 | `Google:` cria, reativa ou mantém Gmail. `Pessoa:` atualiza `PPESSOA.EMAIL` se necessário. `Usuário TOTVS:` garante usuário correto pelo RA. `Tratativas:` cria, reativa, mantém ou corrige vínculo. `Acessos:` garante usuário-filial, remove filiais excedentes e concede perfis de aluno. | `Usuário-filial:` `Portal` apenas na filial do registro. `Perfis:` `Aluno CEL` (`S`,`L`) na coligada `1` ou `Aluno LICEU` (`S`,`L`) na coligada `5`.                         | `PPESSOA.EMAIL` institucional; `PPESSOA.CODUSUARIO=RA`; `GUSUARIO.STATUS=1`; `SUSUARIOFILIAL` somente da filial do aluno com acesso `Portal`; perfis de aluno corretos. | Conta institucional existente e ativa.                                 |             |                 |
+| T-02 | Aluno ativo regular que também é funcionário                                           | `Google:` não provisiona Gmail de aluno. `Usuário TOTVS:` usa CPF como login correto. `Acessos:` garante vínculo, usuário-filial e perfis coerentes com os papéis ativos.                                                                                 | `Usuário-filial:` `Sistema/PGE e Portal`. `Perfis:` perfis de aluno da coligada e demais perfis do papel de funcionário já existentes/transferíveis.                 | `PPESSOA.CODUSUARIO=CPF`; usuário ativo; `SUSUARIOFILIAL` com acesso `Sistema/PGE e Portal`; perfis de aluno presentes quando elegíveis e demais acessos funcionais preservados.              | Não deve haver criação ou reativação motivada pelo fluxo de aluno.     |             |                 |
+| T-03 | Aluno ativo regular que também é responsável                                           | `Google:` não provisiona Gmail de aluno. `Usuário TOTVS:` usa CPF como login correto. `Acessos:` garante vínculo e perfis coerentes; o complemento de usuário-filial entra pela trilha de responsável disparada pelo webhook.                           | `Usuário-filial:` acesso `Portal`, concedido pela trilha de responsável. `Perfis:` aluno + responsável acadêmico/financeiro conforme vínculo.                          | `PPESSOA.CODUSUARIO=CPF`; usuário ativo; perfis de aluno e de responsável coerentes; `SUSUARIOFILIAL` compatível com as alocações resolvidas na trilha de responsável.                         | Não deve haver criação ou reativação motivada pelo fluxo de aluno.     |             |                 |
+| T-04 | Aluno ativo somente em matrícula extra                                                 | `Google:` não cria nem reativa Gmail por causa do extra. `Usuário TOTVS:` mantém regras normais de criação, reativação, correção e vínculo. `Acessos:` garante usuário-filial, remove filiais excedentes e mantém perfis quando aplicável.               | `Usuário-filial:` `Portal` apenas na filial do registro. `Perfis:` perfil de aluno da coligada (`Aluno CEL` ou `Aluno LICEU`).                                         | Usuário final correto; vínculo correto da pessoa com o usuário; `SUSUARIOFILIAL` somente da filial do aluno com acesso `Portal`; perfis corretos.                                             | Ausência de criação ou reativação causada apenas pela matrícula extra. |             |                 |
+| T-05 | Aluno ativo regular e também com matrícula extra ativa                                 | `Google:` matrícula extra não é gatilho autônomo de Gmail. `Usuário TOTVS:` mantém regras normais de aluno elegível. `Acessos:` mantém usuário, vínculo, usuário-filial correto, remove filiais excedentes e concede perfis corretos.                  | `Usuário-filial:` `Portal` apenas na filial do registro. `Perfis:` perfil de aluno da coligada (`Aluno CEL` ou `Aluno LICEU`).                                         | Usuário final correto; vínculo correto; `SUSUARIOFILIAL` somente da filial do aluno com acesso `Portal`; perfis corretos.                                                                   | Comportamento coerente com a regra fechada para extra.                 |             |                 |
+| T-06 | Aluno da coligada 5 com reflexo de curso extra na coligada 6                           | `Regra:` aplica leitura especial da coligada 5 com apoio da 6. `Resultado:` mantém domínio e perfis da coligada 5.                                                                                                                                        | `Usuário-filial:` `Portal` na coligada `5`. `Perfis:` `Aluno LICEU` nos sistemas `S` e `L`, apenas na coligada `5`.                                                   | Usuário correto; perfis apenas da coligada `5`; `SUSUARIOFILIAL` coerente com a coligada/filial do aluno na `5`; sem desvio de vínculo para a coligada `6`.                                  | Domínio da coligada 5.                                                 |             |                 |
+| T-07 | Aluno ativo com papel de funcionário ou responsável e sem CPF                          | `Usuário TOTVS:` falha ao resolver login correto. `Resultado:` não deve concluir reconciliação silenciosa.                                                                                                                                                | `Usuário-filial:` não deve ser conciliado com sucesso. `Perfis:` não deve haver concessão parcial silenciosa.                                                         | Não deve haver alteração parcial silenciosa em `PPESSOA`, `GUSUARIO`, `SUSUARIOFILIAL` ou perfis; erro rastreável em log.                                                                       | Não aplicável.                                                         |             |                 |
+| T-08 | Aluno com cancelamento total, usuário ativo, sem vínculo funcionário nem responsável   | `Usuário-filial:` revoga. `Google:` suspende Gmail quando a regra de regular inativo se aplicar. `Usuário TOTVS:` inativa.                                                                                                                                | `Usuário-filial:` remove o acesso `Portal` da filial do aluno. `Perfis:` deixam de valer por inativação do usuário.                                                   | `GUSUARIO.STATUS=0`; `SUSUARIOFILIAL` da filial do aluno revogado; estado final coerente. `Atenção:` a revogação é da filial informada no contexto, não de uma limpeza global de excedentes.                                        | Conta suspensa quando aplicável.                                       |             |                 |
+| T-09 | Aluno elegível para cancelamento sem usuário vinculado                                 | `Google:` pode atuar se houver regular inativo. `Usuário TOTVS:` não inativa. `Perfis:` não remove.                                                                                                                                                       | `Usuário-filial:` nenhum, por ausência de usuário resolvido. `Perfis:` nenhum removido nesse fluxo.                                                                   | Sem criação ou inativação indevida de usuário; sem remoção indevida de `SUSUARIOFILIAL` ou perfis.                                                                 | Suspensão só se houver regular inativo.                                |             |                 |
+| T-10 | Aluno elegível para cancelamento com vínculo funcionário                               | `Usuário TOTVS:` não inativa. `Perfis:` remove apenas perfis de aluno.                                                                                                                                                                                    | `Usuário-filial:` `Sistema/PGE e Portal`, preservado. `Perfis:` remove `Aluno CEL`/`Aluno LICEU`; preserva perfis de funcionário.                                    | Usuário ativo; `SUSUARIOFILIAL` funcional preservado; perfis de aluno removidos; demais acessos preservados.                                                                                | Não aplicável além da regra padrão.                                    |             |                 |
+| T-11 | Aluno elegível para cancelamento com vínculo responsável                               | `Usuário TOTVS:` não inativa. `Perfis:` remove apenas perfis de aluno.                                                                                                                                                                                    | `Usuário-filial:` `Portal`, preservado/conduzido pela trilha de responsável. `Perfis:` remove os de aluno e preserva os de responsável.                               | Usuário ativo; perfis de aluno removidos; acessos de responsável preservados conforme alocação.                                                                                            | Não aplicável além da regra padrão.                                    |             |                 |
+| T-12 | Aluno elegível para cancelamento com usuário já inativo, mas ainda com perfis de aluno | `Usuário TOTVS:` não inativa novamente. `Perfis:` remove remanescentes.                                                                                                                                                                                   | `Usuário-filial:` sem novo grant. `Perfis:` remove apenas os perfis de aluno remanescentes.                                                                           | Usuário continua inativo; perfis de aluno removidos; sem reativação indevida de `SUSUARIOFILIAL`.                                                                                        | Não aplicável.                                                         |             |                 |
+| T-13 | Aluno com regular inativo e matrícula extra ainda ativa                                | `Google:` suspende Gmail por causa do regular inativo. `Usuário TOTVS:` não inativa se o extra ainda sustentar acesso. `Perfis:` não remove se o acesso ainda estiver sustentado. `Acessos:` mantém apenas a filial ainda válida para o aluno.         | `Usuário-filial:` mantém `Portal` apenas na filial válida do contexto. `Perfis:` mantém perfil de aluno da coligada.                                                   | Usuário não inativado indevidamente; `SUSUARIOFILIAL` mantido somente para a filial válida; perfis preservados quando aplicável.                                                             | Conta suspensa.                                                        |             |                 |
+| T-14 | Aluno cancelado apenas na matrícula extra                                              | `Google:` mantém Gmail como está. `TOTVS:` aplica ações conforme flags finais de usuário e perfis.                                                                                                                                                        | `Usuário-filial:` depende do estado final de regular/extra no retorno. `Perfis:` idem.                                                                                | Estado final coerente com flags de usuário e perfis; se ainda houver acesso válido por regular, `SUSUARIOFILIAL` e perfis devem permanecer.                                                  | Nenhuma suspensão causada apenas pelo cancelamento do extra.           |             |                 |
+| T-15 | Aluno cancelado apenas na matrícula extra e sem usuário vinculado                      | `Usuário TOTVS:` não inativa. `Perfis:` não remove. `Google:` mantém Gmail como está.                                                                                                                                                                     | `Usuário-filial:` nenhum, por ausência de usuário vinculado. `Perfis:` nenhum removido nesse fluxo.                                                                  | Sem alteração indevida de usuário, `SUSUARIOFILIAL` ou perfis.                                                                                                                             | Gmail preservado.                                                      |             |                 |
+| T-16 | Aluno concluinte do último ano do EM no período anterior                               | `Resultado:` trata como cancelamento elegível.                                                                                                                                                                                                            | `Usuário-filial:` revoga a filial do aluno quando o fluxo puder cancelar. `Perfis:` remove por inativação ou revogação elegível.                                     | Resultado equivalente a revogação elegível; validar `GUSUARIO`, `SUSUARIOFILIAL` e perfis no mesmo padrão de cancelamento total.                                                            | Conforme regra de regular inativo.                                     |             |                 |
