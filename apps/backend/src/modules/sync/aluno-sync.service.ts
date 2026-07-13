@@ -13,6 +13,7 @@ import { AlunoTotvsDto } from '../integrations/totvs/dto/aluno-totvs.dto'
 import {
   getColigadaConfigById,
   listColigadasConfig,
+  normalizeColigadaId,
 } from './utils/coligadas-config'
 
 @Injectable()
@@ -140,8 +141,10 @@ export class AlunoSyncService {
    */
   async syncColigada(
     periodoLetivo: string,
-    coligada: ColigadaConfig,
+    coligadaInput: ColigadaConfig,
   ): Promise<void> {
+    const coligada = getColigadaConfigById(coligadaInput.id)
+
     this.logger.log(
       `Adicionando job para coligada ${coligada.id} — período ${periodoLetivo}`,
     )
@@ -171,6 +174,7 @@ export class AlunoSyncService {
    */
   async syncAluno(aluno: any, coligada: ColigadaConfig): Promise<void> {
     const payload = aluno as AlunoTotvsDto
+    const coligadaNormalizada = getColigadaConfigById(coligada.id)
 
     this.logger.log(`Adicionando job para aluno ${aluno.CD_Registro_Academico}`)
 
@@ -178,7 +182,7 @@ export class AlunoSyncService {
       'sync-aluno',
       {
         aluno: payload,
-        coligada,
+        coligada: coligadaNormalizada,
       } as AlunoJobData,
       {
         attempts: 3,
@@ -202,7 +206,7 @@ export class AlunoSyncService {
     const coligada = getColigadaConfigById(CD_Coligada)
 
     this.logger.log(
-      `Adicionando job de cancelamento para coligada ${CD_Coligada} — período ${CD_Periodo_Letivo}`,
+      `Adicionando job de cancelamento para coligada ${coligada.id} — período ${CD_Periodo_Letivo}`,
     )
 
     const job = await this.alunoSyncQueue.add(
@@ -222,7 +226,7 @@ export class AlunoSyncService {
     )
 
     this.logger.log(
-      `Job de cancelamento da coligada ${CD_Coligada} adicionado à fila (ID: ${job.id})`,
+      `Job de cancelamento da coligada ${coligada.id} adicionado à fila (ID: ${job.id})`,
     )
   }
 
@@ -283,6 +287,7 @@ export class AlunoSyncService {
     TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' | 'WEBHOOK'
   }): Promise<void> {
     const coligada = getColigadaConfigById(data.CD_Coligada)
+    const CD_Coligada = normalizeColigadaId(data.CD_Coligada)
 
     this.logger.log(
       `Adicionando job de cancelamento para aluno ${data.CD_Registro_Academico}`,
@@ -304,7 +309,7 @@ export class AlunoSyncService {
         },
         jobId: this.buildAlunoCancelamentoJobId({
           CD_Periodo_Letivo: data.CD_Periodo_Letivo,
-          CD_Coligada: data.CD_Coligada,
+          CD_Coligada,
           CD_Registro_Academico: data.CD_Registro_Academico,
           TP_Origem_Disparo: data.TP_Origem_Disparo,
         }),

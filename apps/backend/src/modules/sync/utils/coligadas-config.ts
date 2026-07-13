@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common'
 import { ColigadaConfig } from '../interfaces/coligada-config.interface'
 
+const COLIGADA_ALIAS_MAP = new Map<number, number>([[6, 5]])
+
 const COLIGADAS_CONFIG: ColigadaConfig[] = [
   {
     id: 1,
@@ -20,8 +22,15 @@ export function listColigadasConfig(): ColigadaConfig[] {
   return [...COLIGADAS_CONFIG]
 }
 
+export function normalizeColigadaId(CD_Coligada: number): number {
+  return COLIGADA_ALIAS_MAP.get(CD_Coligada) ?? CD_Coligada
+}
+
 export function getColigadaConfigById(CD_Coligada: number): ColigadaConfig {
-  const coligada = COLIGADAS_CONFIG.find((item) => item.id === CD_Coligada)
+  const coligadaNormalizada = normalizeColigadaId(CD_Coligada)
+  const coligada = COLIGADAS_CONFIG.find(
+    (item) => item.id === coligadaNormalizada,
+  )
 
   if (!coligada) {
     throw new BadRequestException(
