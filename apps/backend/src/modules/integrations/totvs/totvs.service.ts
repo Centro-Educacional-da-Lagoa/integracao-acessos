@@ -37,7 +37,9 @@ export interface UsuarioFilialTotvsDto {
 export class TotvsService {
   private readonly logger = new Logger(TotvsService.name)
   private readonly tableCorpore = getTotvsTableName()
-  private static readonly COLIGADAS_BLOQUEADAS_PROCEDURE = new Set([6])
+  private static readonly PROCEDURE_COLIGADA_ALIAS = new Map<number, number>([
+    [6, 5],
+  ])
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -99,22 +101,22 @@ export class TotvsService {
     coligada: number,
     CD_Registro_Academico: string | null = null,
   ): Promise<AlunoTotvsDto[]> {
-    this.assertProcedureColigadaPermitida(coligada)
+    const coligadaProcedure = this.normalizeProcedureColigada(coligada)
 
     const periodoLetivoEscapado = periodoLetivo.replace(/'/g, "''")
     const registroAcademicoSql = this.toSqlStringOrNull(CD_Registro_Academico)
 
     this.logger.log(
-      `Buscando alunos ativos — coligada ${coligada}, período ${periodoLetivo}`,
+      `Buscando alunos ativos — coligada solicitada ${coligada}, coligada procedure ${coligadaProcedure}, período ${periodoLetivo}`,
     )
 
     const result = await this.prisma.$queryRawUnsafe<AlunoTotvsDto[]>(
       `
-      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Aluno_Ativacao_Acesso] '${periodoLetivoEscapado}', ${coligada}, ${registroAcademicoSql}`,
+      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Aluno_Ativacao_Acesso] '${periodoLetivoEscapado}', ${coligadaProcedure}, ${registroAcademicoSql}`,
     )
 
     this.logger.log(
-      `Encontrados ${result.length} alunos na coligada ${coligada}`,
+      `Encontrados ${result.length} alunos para coligada solicitada ${coligada} via procedure ${coligadaProcedure}`,
     )
     return result
   }
@@ -124,24 +126,24 @@ export class TotvsService {
     CD_Coligada: number,
     CD_Registro_Academico: string | null = null,
   ): Promise<AlunoCancelamentoTotvsDto[]> {
-    this.assertProcedureColigadaPermitida(CD_Coligada)
+    const coligadaProcedure = this.normalizeProcedureColigada(CD_Coligada)
 
     const periodoLetivoEscapado = CD_Periodo_Letivo.replace(/'/g, "''")
     const registroAcademicoSql = this.toSqlStringOrNull(CD_Registro_Academico)
 
     this.logger.log(
-      `Buscando alunos para cancelamento — coligada ${CD_Coligada}, período ${CD_Periodo_Letivo}`,
+      `Buscando alunos para cancelamento — coligada solicitada ${CD_Coligada}, coligada procedure ${coligadaProcedure}, período ${CD_Periodo_Letivo}`,
     )
 
     const result = await this.prisma.$queryRawUnsafe<
       AlunoCancelamentoTotvsDto[]
     >(
       `
-      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso] '${periodoLetivoEscapado}', ${CD_Coligada}, ${registroAcademicoSql}`,
+      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso] '${periodoLetivoEscapado}', ${coligadaProcedure}, ${registroAcademicoSql}`,
     )
 
     this.logger.log(
-      `Encontrados ${result.length} aluno(s) para cancelamento na coligada ${CD_Coligada}`,
+      `Encontrados ${result.length} aluno(s) para cancelamento na coligada solicitada ${CD_Coligada} via procedure ${coligadaProcedure}`,
     )
 
     return result
@@ -287,12 +289,17 @@ export class TotvsService {
     return `${Math.trunc(value)}`
   }
 
-  private assertProcedureColigadaPermitida(CD_Coligada: number): void {
-    if (TotvsService.COLIGADAS_BLOQUEADAS_PROCEDURE.has(CD_Coligada)) {
-      throw new Error(
-        `Coligada ${CD_Coligada} não é elegível para execução de procedure.`,
+  private normalizeProcedureColigada(CD_Coligada: number): number {
+    const coligadaNormalizada =
+      TotvsService.PROCEDURE_COLIGADA_ALIAS.get(CD_Coligada) ?? CD_Coligada
+
+    if (coligadaNormalizada !== CD_Coligada) {
+      this.logger.warn(
+        `Coligada ${CD_Coligada} remapeada para ${coligadaNormalizada} na execução da procedure TOTVS.`,
       )
     }
+
+    return coligadaNormalizada
   }
 
   // ─── Requisições à API REST do TOTVS ─────────────────────────────────────────

@@ -43,7 +43,6 @@ export interface WebhookAlunoJobData {
 @Processor('aluno-sync')
 export class AlunoSyncProcessor {
   private readonly logger = new Logger(AlunoSyncProcessor.name)
-  private static readonly COLIGADAS_BLOQUEADAS_PROCEDURE = new Set([6])
 
   constructor(
     @InjectQueue('aluno-sync') private readonly alunoSyncQueue: Queue,
@@ -139,13 +138,6 @@ export class AlunoSyncProcessor {
   async handleWebhookAluno(job: Job<WebhookAlunoJobData>): Promise<void> {
     const { CD_Periodo_Letivo, CD_Registro_Academico, coligada } = job.data
 
-    if (this.isProcedureBlockedColigada(coligada.id)) {
-      this.logger.warn(
-        `[Job ${job.id}] [Webhook] Coligada ${coligada.id} bloqueada para execução de procedure`,
-      )
-      return
-    }
-
     this.logger.log(
       `[Job ${job.id}] [Webhook] Iniciando processamento do aluno ${CD_Registro_Academico} (coligada ${coligada.id}, período ${CD_Periodo_Letivo})`,
     )
@@ -199,13 +191,6 @@ export class AlunoSyncProcessor {
     periodoLetivo: string,
     coligada: ColigadaConfig,
   ): Promise<void> {
-    if (this.isProcedureBlockedColigada(coligada.id)) {
-      this.logger.warn(
-        `[Coligada ${coligada.id}] Execução de procedure bloqueada por regra de negócio`,
-      )
-      return
-    }
-
     this.logger.log(`[Coligada ${coligada.id}] Buscando alunos ativos...`)
 
     const alunos = await this.totvsService.fetchAlunosAtivos(
@@ -292,13 +277,6 @@ export class AlunoSyncProcessor {
     coligada: ColigadaConfig,
     TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO',
   ): Promise<void> {
-    if (this.isProcedureBlockedColigada(coligada.id)) {
-      this.logger.warn(
-        `[Coligada ${coligada.id}] Execução de procedure de cancelamento bloqueada por regra de negócio`,
-      )
-      return
-    }
-
     this.logger.log(
       `[Coligada ${coligada.id}] Buscando alunos para cancelamento...`,
     )
@@ -344,13 +322,6 @@ export class AlunoSyncProcessor {
     CD_Registro_Academico,
     TP_Origem_Disparo,
   }: CancelamentoAlunoJobData): Promise<void> {
-    if (this.isProcedureBlockedColigada(coligada.id)) {
-      this.logger.warn(
-        `[Cancelamento] Coligada ${coligada.id} bloqueada para execução de procedure`,
-      )
-      return
-    }
-
     const alunoCancelamento =
       aluno ??
       (await this.totvsService.fetchAlunoCancelamento(
@@ -398,9 +369,5 @@ export class AlunoSyncProcessor {
     }
 
     await this.accessProvisioningService.revogarAcesso(ctx)
-  }
-
-  private isProcedureBlockedColigada(CD_Coligada: number): boolean {
-    return AlunoSyncProcessor.COLIGADAS_BLOQUEADAS_PROCEDURE.has(CD_Coligada)
   }
 }

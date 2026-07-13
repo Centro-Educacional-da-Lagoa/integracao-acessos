@@ -142,8 +142,6 @@ export class AlunoSyncService {
     periodoLetivo: string,
     coligada: ColigadaConfig,
   ): Promise<void> {
-    this.assertProcedureColigadaPermitida(coligada.id)
-
     this.logger.log(
       `Adicionando job para coligada ${coligada.id} — período ${periodoLetivo}`,
     )
@@ -201,8 +199,6 @@ export class AlunoSyncService {
     CD_Coligada: number,
     TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' = 'BATCH',
   ): Promise<void> {
-    this.assertProcedureColigadaPermitida(CD_Coligada)
-
     const coligada = getColigadaConfigById(CD_Coligada)
 
     this.logger.log(
@@ -286,8 +282,6 @@ export class AlunoSyncService {
     CD_Periodo_Letivo: string
     TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' | 'WEBHOOK'
   }): Promise<void> {
-    this.assertProcedureColigadaPermitida(data.CD_Coligada)
-
     const coligada = getColigadaConfigById(data.CD_Coligada)
 
     this.logger.log(
@@ -338,7 +332,6 @@ export class AlunoSyncService {
     const coligada = data.CD_Coligada
       ? getColigadaConfigById(data.CD_Coligada)
       : this.resolveColigadaFromConfig()
-    this.assertProcedureColigadaPermitida(coligada.id)
 
     this.logger.log(
       `Adicionando job de webhook para aluno ${data.CD_Registro_Academico} (coligada ${coligada.id}, período ${CD_Periodo_Letivo})`,
@@ -390,13 +383,5 @@ export class AlunoSyncService {
 
   private isProcedureBlockedColigada(CD_Coligada: number): boolean {
     return AlunoSyncService.COLIGADAS_BLOQUEADAS_PROCEDURE.has(CD_Coligada)
-  }
-
-  private assertProcedureColigadaPermitida(CD_Coligada: number): void {
-    if (this.isProcedureBlockedColigada(CD_Coligada)) {
-      throw new BadRequestException(
-        `CD_Coligada ${CD_Coligada} não é elegível para execução de procedure.`,
-      )
-    }
   }
 }
