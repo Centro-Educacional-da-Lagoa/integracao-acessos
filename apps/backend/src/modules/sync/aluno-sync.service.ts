@@ -326,7 +326,7 @@ export class AlunoSyncService {
   async syncWebhookAluno(data: {
     CD_Registro_Academico: string
     CD_Coligada?: number
-    CD_Periodo_Letivo?: string
+    CD_Periodo_Letivo?: string | null
   }): Promise<void> {
     const CD_Periodo_Letivo = data.CD_Periodo_Letivo ?? process.env.PERIODO_LETIVO
     if (!CD_Periodo_Letivo) {
