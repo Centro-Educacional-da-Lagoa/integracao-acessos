@@ -884,10 +884,7 @@ export class TotvsService {
     emailAtual: string | null,
     emailEsperado: string | null,
   ): Promise<TotvsApiResponse> {
-    const payload: Record<string, unknown> = {
-      STATUS: 1,
-      DATAEXPIRACAO: null,
-    }
+    const payload: Record<string, unknown> = { STATUS: 1 }
 
     const deveAtualizarEmail =
       !!emailEsperado && (!emailAtual || emailAtual !== emailEsperado)
