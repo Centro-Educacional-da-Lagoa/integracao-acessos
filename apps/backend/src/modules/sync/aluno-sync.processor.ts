@@ -155,14 +155,12 @@ export class AlunoSyncProcessor {
       CD_Registro_Academico,
     )
 
-    if (!alunoAtivo) {
+    if (alunoAtivo) {
       this.logger.warn(
-        `[Webhook] Aluno ${CD_Registro_Academico} não encontrado na procedure de ativação para a coligada ${coligada.id}`,
+        `[Webhook] Aluno ${CD_Registro_Academico} encontrado na procedure de ativação para a coligada ${coligada.id}`,
       )
-      return
+      await this.syncAluno(alunoAtivo, coligada)
     }
-
-    await this.syncAluno(alunoAtivo, coligada)
 
     this.logger.log(
       `[Job ${job.id}] [Webhook] Enfileirando responsáveis após reconciliação do aluno ${CD_Registro_Academico}`,
