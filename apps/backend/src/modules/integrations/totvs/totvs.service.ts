@@ -884,7 +884,10 @@ export class TotvsService {
     emailAtual: string | null,
     emailEsperado: string | null,
   ): Promise<TotvsApiResponse> {
-    const payload: Record<string, unknown> = { STATUS: 1 }
+    const payload: Record<string, unknown> = {
+      STATUS: 1,
+      DATAEXPIRACAO: null,
+    }
 
     const deveAtualizarEmail =
       !!emailEsperado && (!emailAtual || emailAtual !== emailEsperado)
@@ -1201,7 +1204,11 @@ export class TotvsService {
       `Atualizando email do usuário ativo ${cdUsuario} para ${emailEsperado}`,
     )
 
-    const payload = { EMAIL: emailEsperado }
+    const payload = {
+      STATUS: 1,
+      EMAIL: emailEsperado,
+      DATAEXPIRACAO: null,
+    }
 
     try {
       const response = await axios({
@@ -1228,6 +1235,63 @@ export class TotvsService {
       this.logger.error('------------------------------------')
       this.logger.error(
         `ERRO AO ATUALIZAR EMAIL DO USUÁRIO ${cdUsuario} NO TOTVS:`,
+      )
+
+      if (axios.isAxiosError(error)) {
+        this.logger.error(error.response?.data)
+      } else {
+        this.logger.error(error)
+      }
+
+      this.logger.error('PAYLOAD:')
+      this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error('------------------------------------')
+
+      return {
+        status: 'Error',
+        data:
+          axios.isAxiosError(error) && error.response
+            ? error.response.data
+            : (error as Error),
+      }
+    }
+  }
+
+  async limparDataExpiracaoUsuario(cdUsuario: string): Promise<TotvsApiResponse> {
+    this.logger.log(
+      `Limpando DATAEXPIRACAO do usuário ativo ${cdUsuario} no TOTVS`,
+    )
+
+    const payload = {
+      STATUS: 1,
+      DATAEXPIRACAO: null,
+    }
+
+    try {
+      const response = await axios({
+        method: 'patch',
+        url: `${totvsApiConstants.urlAPI}/rmsrestdataserver/rest/GlbUsuarioData/${cdUsuario}`,
+        headers: {
+          CODFILIAL: totvsApiConstants.codigoFilial,
+          CODSISTEMA: totvsApiConstants.codigoSistema,
+          Authorization: totvsApiConstants.authorization,
+        },
+        data: payload,
+      })
+
+      this.handleTotvsResponse(
+        response,
+        `limparDataExpiracaoUsuario cdUsuario=${cdUsuario}`,
+      )
+
+      this.logger.log(
+        `DATAEXPIRACAO do usuário ${cdUsuario} limpa com sucesso no TOTVS`,
+      )
+      return { status: 'Sucesso', data: response.data }
+    } catch (error: any) {
+      this.logger.error('------------------------------------')
+      this.logger.error(
+        `ERRO AO LIMPAR DATAEXPIRACAO DO USUÁRIO ${cdUsuario} NO TOTVS:`,
       )
 
       if (axios.isAxiosError(error)) {

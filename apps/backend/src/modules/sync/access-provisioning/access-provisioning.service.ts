@@ -401,18 +401,12 @@ export class AccessProvisioningService {
           `[Usuário] Falha ao criar usuário ${cdUsuarioCorreto} — pessoa ${ctx.CD_Pessoa}`,
         )
       }
-    } else if (usuarioExistente.STATUS !== 1) {
-      const emailAlvoUsuario = this._resolverEmailAlvoUsuario(ctx)
-      const result = await this.totvsService.ativarUsuario(
+    } else {
+      await this._garantirEstadoAtivoUsuario(
+        ctx,
         cdUsuarioCorreto,
-        usuarioExistente.EMAIL ?? null,
-        emailAlvoUsuario,
+        usuarioExistente,
       )
-      if (result.status === 'Error') {
-        throw new Error(
-          `[Usuário] Falha ao reativar usuário ${cdUsuarioCorreto} — pessoa ${ctx.CD_Pessoa}`,
-        )
-      }
     }
 
     const resultVincular = await this.totvsService.vincularUsuarioPessoa(
@@ -437,37 +431,74 @@ export class AccessProvisioningService {
     ctx: PessoaAcessoContext,
     cdUsuario: string,
   ): Promise<any> {
-    if (ctx.IN_Usuario_Ativo !== 1) {
-      const emailAlvoUsuario = this._resolverEmailAlvoUsuario(ctx)
+    const usuarioAtual = await this.totvsService.verificarUsuario(cdUsuario)
+
+    if (!usuarioAtual) {
+      this.logger.warn(
+        `[Usuário] Usuário ${cdUsuario} não encontrado durante garantia de estado ativo`,
+      )
+      return null
+    }
+
+    await this._garantirEstadoAtivoUsuario(ctx, cdUsuario, usuarioAtual)
+
+    return await this.totvsService.verificarUsuario(cdUsuario)
+  }
+
+  private async _garantirEstadoAtivoUsuario(
+    ctx: PessoaAcessoContext,
+    cdUsuario: string,
+    usuarioAtual: any,
+  ): Promise<void> {
+    const emailAlvoUsuario = this._resolverEmailAlvoUsuario(ctx)
+
+    if (usuarioAtual.STATUS !== 1) {
       const result = await this.totvsService.ativarUsuario(
         cdUsuario,
-        ctx.TX_Email_Usuario,
+        usuarioAtual.EMAIL ?? ctx.TX_Email_Usuario ?? null,
         emailAlvoUsuario,
       )
       if (result.status === 'Error') {
-        this.logger.warn(`[Usuário] Falha ao reativar usuário ${cdUsuario}`)
-      }
-    } else {
-      // Atualiza email do usuário apenas para alunos com matrícula regular ativa
-      const deveAtualizarEmail =
-        this._deveGerenciarEmailUsuarioAluno(ctx) &&
-        (!ctx.TX_Email_Usuario ||
-          ctx.TX_Email_Usuario !== ctx.TX_Email_Institucional)
-
-      if (deveAtualizarEmail) {
-        const result = await this.totvsService.atualizarEmailUsuario(
-          cdUsuario,
-          ctx.TX_Email_Institucional,
+        throw new Error(
+          `[Usuário] Falha ao reativar usuário ${cdUsuario} — pessoa ${ctx.CD_Pessoa}`,
         )
-        if (result.status === 'Error') {
-          this.logger.warn(
-            `[Usuário] Falha ao atualizar email do usuário ${cdUsuario}`,
-          )
-        }
       }
+      return
     }
 
-    return await this.totvsService.verificarUsuario(cdUsuario)
+    const deveAtualizarEmail =
+      this._deveGerenciarEmailUsuarioAluno(ctx) &&
+      !!emailAlvoUsuario &&
+      usuarioAtual.EMAIL !== emailAlvoUsuario
+
+    if (deveAtualizarEmail) {
+      const result = await this.totvsService.atualizarEmailUsuario(
+        cdUsuario,
+        emailAlvoUsuario,
+      )
+      if (result.status === 'Error') {
+        this.logger.warn(
+          `[Usuário] Falha ao atualizar email do usuário ${cdUsuario}`,
+        )
+      }
+      return
+    }
+
+    if (this._possuiDataExpiracaoPreenchida(usuarioAtual)) {
+      const result =
+        await this.totvsService.limparDataExpiracaoUsuario(cdUsuario)
+      if (result.status === 'Error') {
+        this.logger.warn(
+          `[Usuário] Falha ao limpar DATAEXPIRACAO do usuário ${cdUsuario}`,
+        )
+      }
+    }
+  }
+
+  private _possuiDataExpiracaoPreenchida(usuario: any): boolean {
+    const dataExpiracao = usuario?.DATAEXPIRACAO
+
+    return dataExpiracao !== null && dataExpiracao !== undefined && dataExpiracao !== ''
   }
 
   private async _garantirUsuarioFilial(
