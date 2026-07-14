@@ -481,24 +481,7 @@ export class AccessProvisioningService {
           `[Usuário] Falha ao atualizar email do usuário ${cdUsuario}`,
         )
       }
-      return
     }
-
-    if (this._possuiDataExpiracaoPreenchida(usuarioAtual)) {
-      const result =
-        await this.totvsService.limparDataExpiracaoUsuario(cdUsuario)
-      if (result.status === 'Error') {
-        this.logger.warn(
-          `[Usuário] Falha ao limpar DATAEXPIRACAO do usuário ${cdUsuario}`,
-        )
-      }
-    }
-  }
-
-  private _possuiDataExpiracaoPreenchida(usuario: any): boolean {
-    const dataExpiracao = usuario?.DATAEXPIRACAO
-
-    return dataExpiracao !== null && dataExpiracao !== undefined && dataExpiracao !== ''
   }
 
   private async _garantirUsuarioFilial(
