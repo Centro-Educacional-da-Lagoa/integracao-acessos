@@ -67,7 +67,8 @@ BEGIN
 		, IN_Inativo_Extra				int						not null
 		, IN_Funcionario				int						null
 		, IN_Responsavel				int						null
-	)
+		, JS_Alocacoes_Ativas			varchar(max) collate database_default	null
+		)
 
 	insert into #tmp_aluno_ativo_base
 		( CD_Coligada
@@ -90,6 +91,7 @@ BEGIN
 		, IN_Inativo_Extra
 		, IN_Funcionario
 		, IN_Responsavel
+		, JS_Alocacoes_Ativas
 		)
 	exec [dbo].[PR_MGA_Consulta_Aluno_Ativacao_Acesso]
 		 @prm_cd_periodo_letivo = @prm_cd_periodo_letivo
@@ -117,6 +119,7 @@ BEGIN
 		, IN_Inativo_Extra
 		, IN_Funcionario
 		, IN_Responsavel
+		, JS_Alocacoes_Ativas
 		)
 	exec [dbo].[PR_MGA_Consulta_Aluno_Ativacao_Acesso]
 		 @prm_cd_periodo_letivo = @prm_cd_periodo_letivo
@@ -140,10 +143,11 @@ BEGIN
 		, IN_Inativo_Regular		int						not null
 		, IN_Existe_Matricula_Extra	int						not null
 		, IN_Inativo_Extra			int						not null
+		, TP_Matricula				varchar(20) collate database_default	null
 	)
 
 	insert into #tmp_resp_aluno
-	select	 case when atv.CD_Coligada = 6 then 5 else atv.CD_Coligada end as CD_Coligada
+	select	 atv.CD_Coligada
 			, atv.CD_Filial
 			, atv.CD_Pessoa
 			, atv.CD_Registro_Academico
@@ -155,6 +159,7 @@ BEGIN
 			, atv.IN_Inativo_Regular
 			, atv.IN_Existe_Matricula_Extra
 			, atv.IN_Inativo_Extra
+			, atv.NM_Tipo_Matricula
 	from	#tmp_aluno_ativo_base	as atv
 	inner	join dbo.vfiliacao		as vfi (nolock)
 	  on	vfi.codpessoafilho = atv.CD_Pessoa
@@ -163,7 +168,7 @@ BEGIN
 	where	nullif(replace(replace(replace(replace(ltrim(rtrim(pfi.cpf)), '.', ''), '-', ''), '/', ''), ' ', ''), '') is not null
 
 	insert into #tmp_resp_aluno
-	select	 case when atv.CD_Coligada = 6 then 5 else atv.CD_Coligada end as CD_Coligada
+	select	 atv.CD_Coligada
 			, atv.CD_Filial
 			, atv.CD_Pessoa
 			, atv.CD_Registro_Academico
@@ -175,6 +180,7 @@ BEGIN
 			, atv.IN_Inativo_Regular
 			, atv.IN_Existe_Matricula_Extra
 			, atv.IN_Inativo_Extra
+			, atv.NM_Tipo_Matricula
 	from	#tmp_aluno_ativo_base	as atv
 	inner	join dbo.saluno			as aln (nolock)
 	  on	aln.codcoligada = atv.CD_Coligada
@@ -185,7 +191,7 @@ BEGIN
 	  and	nullif(replace(replace(replace(replace(ltrim(rtrim(pra.cpf)), '.', ''), '-', ''), '/', ''), ' ', ''), '') is not null
 
 	insert into #tmp_resp_aluno
-	select	 case when atv.CD_Coligada = 6 then 5 else atv.CD_Coligada end as CD_Coligada
+	select	 atv.CD_Coligada
 			, atv.CD_Filial
 			, atv.CD_Pessoa
 			, atv.CD_Registro_Academico
@@ -197,6 +203,7 @@ BEGIN
 			, atv.IN_Inativo_Regular
 			, atv.IN_Existe_Matricula_Extra
 			, atv.IN_Inativo_Extra
+			, atv.NM_Tipo_Matricula
 	from	#tmp_aluno_ativo_base	as atv
 	inner	join dbo.saluno			as aln (nolock)
 	  on	aln.codcoligada = atv.CD_Coligada
@@ -334,6 +341,15 @@ BEGIN
 			, ctx.IN_Filiacao
 			, ctx.IN_Responsavel_Academico
 			, ctx.IN_Responsavel_Financeiro
+			, (
+				select	distinct
+						 rsa2.CD_Coligada
+						, rsa2.CD_Filial
+						, rsa2.TP_Matricula
+				from	#tmp_resp_aluno as rsa2
+				where	rsa2.CD_Agregador_Responsavel = ctx.CD_Agregador_Responsavel
+				for json path
+			  ) as JS_Alocacoes_Ativas
 	from	cte_resp					as ctx
 	left	join dbo.ppessoa			as pss (nolock)
 	  on	pss.codigo = ctx.CD_Pessoa_Responsavel

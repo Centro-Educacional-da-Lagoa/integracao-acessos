@@ -25,12 +25,24 @@ interface GarantirUsuarioFilialParams {
   inFuncionario: number
 }
 
+interface ValidacaoUsuarioFilialMestres {
+  valido: boolean
+  motivo?: string
+  detalhes?: Record<string, unknown>
+}
+
 export interface UsuarioFilialTotvsDto {
   CODCOLIGADA: number
   CODTIPOCURSO: number
   CODFILIAL: number
   CODUSUARIO: string
   ACESSO: number | string | null
+}
+
+export interface IdentidadeAlunoTotvsDto {
+  CD_Pessoa: number
+  CD_Registro_Academico_Origem: string
+  CD_Registro_Academico_Coligada5: string | null
 }
 
 @Injectable()
@@ -183,6 +195,42 @@ export class TotvsService {
         (aluno) => aluno.CD_Registro_Academico === CD_Registro_Academico,
       ) ?? null
     )
+  }
+
+  async fetchIdentidadeAlunoPorRa(
+    CD_Periodo_Letivo: string,
+    CD_Coligada_Origem: number,
+    CD_Registro_Academico_Origem: string,
+  ): Promise<IdentidadeAlunoTotvsDto | null> {
+    const periodoLetivoEscapado = CD_Periodo_Letivo.replace(/'/g, "''")
+    const registroAcademicoSql = this.toSqlStringOrNull(
+      CD_Registro_Academico_Origem,
+    )
+
+    const result = await this.prisma.$queryRawUnsafe<IdentidadeAlunoTotvsDto[]>(
+      `
+      SELECT TOP 1
+             aln6.CODPESSOA AS CD_Pessoa
+           , aln6.RA AS CD_Registro_Academico_Origem
+           , aln5.RA AS CD_Registro_Academico_Coligada5
+      FROM ${this.tableCorpore}.[dbo].[SALUNO] AS aln6 WITH (NOLOCK)
+      LEFT JOIN ${this.tableCorpore}.[dbo].[SALUNO] AS aln5 WITH (NOLOCK)
+        ON aln5.CODPESSOA = aln6.CODPESSOA
+       AND aln5.CODCOLIGADA = 5
+      LEFT JOIN ${this.tableCorpore}.[dbo].[SMATRICPL] AS mtpl5 WITH (NOLOCK)
+        ON mtpl5.CODCOLIGADA = aln5.CODCOLIGADA
+       AND mtpl5.RA = aln5.RA
+      LEFT JOIN ${this.tableCorpore}.[dbo].[SPLETIVO] AS prlt5 WITH (NOLOCK)
+        ON prlt5.CODCOLIGADA = mtpl5.CODCOLIGADA
+       AND prlt5.IDPERLET = mtpl5.IDPERLET
+       AND prlt5.CODPERLET = '${periodoLetivoEscapado}'
+      WHERE aln6.CODCOLIGADA = ${Math.trunc(CD_Coligada_Origem)}
+        AND aln6.RA = ${registroAcademicoSql}
+      ORDER BY CASE WHEN prlt5.CODPERLET IS NULL THEN 1 ELSE 0 END
+      `,
+    )
+
+    return result[0] ?? null
   }
 
   async fetchResponsaveisCancelamento(
@@ -456,6 +504,70 @@ export class TotvsService {
     }
   }
 
+  private _hasText(value: string | null | undefined): boolean {
+    return typeof value === 'string' && value.trim().length > 0
+  }
+
+  private async _validarMestresUsuarioFilial(
+    cdColigada: number,
+    cdFilial: number,
+    cdUsuario: string,
+  ): Promise<ValidacaoUsuarioFilialMestres> {
+    if (!this._hasText(cdUsuario)) {
+      return {
+        valido: false,
+        motivo: 'CODUSUARIO ausente',
+      }
+    }
+
+    if (!Number.isFinite(cdColigada) || !Number.isFinite(cdFilial)) {
+      return {
+        valido: false,
+        motivo: 'CODCOLIGADA/CODFILIAL inválido',
+        detalhes: { cdColigada, cdFilial },
+      }
+    }
+
+    const cdUsuarioSql = this.toSqlStringOrNull(cdUsuario)
+
+    const usuario = await this.prisma.$queryRawUnsafe<
+      Array<{ EXISTE: number }>
+    >(
+      `
+      SELECT TOP 1 1 AS EXISTE
+      FROM ${this.tableCorpore}.[dbo].[GUSUARIO] WITH (NOLOCK)
+      WHERE CODUSUARIO = ${cdUsuarioSql}
+      `,
+    )
+
+    if (usuario.length === 0) {
+      return {
+        valido: false,
+        motivo: 'GUSUARIO não encontrado',
+        detalhes: { cdUsuario },
+      }
+    }
+
+    const filial = await this.prisma.$queryRawUnsafe<Array<{ EXISTE: number }>>(
+      `
+      SELECT TOP 1 1 AS EXISTE
+      FROM ${this.tableCorpore}.[dbo].[GFILIAL] WITH (NOLOCK)
+      WHERE CODCOLIGADA = ${Math.trunc(cdColigada)}
+        AND CODFILIAL = ${Math.trunc(cdFilial)}
+      `,
+    )
+
+    if (filial.length === 0) {
+      return {
+        valido: false,
+        motivo: 'GFILIAL não encontrada para coligada/filial',
+        detalhes: { cdColigada, cdFilial },
+      }
+    }
+
+    return { valido: true }
+  }
+
   private _extrairAcessoUsuarioFilial(dados: any): string | null {
     const fonte =
       dados?.SUsuarioFilial ??
@@ -518,7 +630,7 @@ export class TotvsService {
       FROM	${this.tableCorpore}.[dbo].[SUSUARIOFILIAL] WITH (NOLOCK)
       WHERE	CODUSUARIO = ${cdUsuarioSql}
         AND	CODTIPOCURSO = ${codTipoCurso}
-        AND	CODCOLIGADA IN (1, 5)
+        AND	CODCOLIGADA IN (1, 5, 6)
        -- AND	ISNULL(ACESSO, 0) <> 0
       `,
     )
@@ -549,6 +661,27 @@ export class TotvsService {
     )
 
     try {
+      const validacao = await this._validarMestresUsuarioFilial(
+        cdColigada,
+        cdFilial,
+        cdUsuario,
+      )
+
+      if (!validacao.valido) {
+        this.logger.warn(
+          `[UsuarioFilial] Validação prévia bloqueou acesso para ${cdUsuario} (coligada ${cdColigada}, filial ${cdFilial}): ${validacao.motivo}`,
+        )
+
+        return {
+          status: 'Error',
+          data: {
+            code: 'VALIDACAO_MESTRE_USUARIO_FILIAL',
+            detail: validacao.motivo,
+            details: validacao.detalhes,
+          },
+        }
+      }
+
       const existente = await this._buscarUsuarioFilial(
         cdColigada,
         cdFilial,
@@ -732,6 +865,22 @@ export class TotvsService {
     cdPessoa: string,
     cdUsuario: string,
   ): Promise<TotvsApiResponse> {
+    if (!this._hasText(cdPessoa)) {
+      this.logger.warn(
+        `Vínculo usuário-pessoa bloqueado: CD_Pessoa ausente para usuário ${cdUsuario} (coligada ${coligada})`,
+      )
+
+      return {
+        status: 'Error',
+        data: {
+          code: 'CD_PESSOA_AUSENTE',
+          detail: 'CD_Pessoa é obrigatório para vincular usuário à pessoa',
+          cdUsuario,
+          coligada,
+        },
+      }
+    }
+
     this.logger.log(
       `Vinculando usuário ${cdUsuario} à pessoa ${cdPessoa} (coligada ${coligada})`,
     )
@@ -807,8 +956,10 @@ export class TotvsService {
       ? dtNascimento.replace(/\//g, '')
       : cdUsuario
 
-    // Data de início: data atual no formato ISO (YYYY-MM-DD)
-    const dataInicio = new Date().toISOString().split('T')[0]
+    const hoje = new Date()
+    const dataInicio = `${String(hoje.getDate()).padStart(2, '0')}/${String(
+      hoje.getMonth() + 1,
+    ).padStart(2, '0')}/${hoje.getFullYear()} 00:00:00`
 
     const payload: Record<string, unknown> = {
       CODUSUARIO: cdUsuario,

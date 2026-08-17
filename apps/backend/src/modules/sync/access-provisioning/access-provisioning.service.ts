@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common'
 import { TotvsService } from '../../integrations/totvs/totvs.service'
 import { GoogleService } from '../../integrations/google/google.service'
-import { PessoaAcessoContext } from './interfaces/pessoa-acesso-context.interface'
+import {
+  AlocacaoAtivaContext,
+  PessoaAcessoContext,
+} from './interfaces/pessoa-acesso-context.interface'
 import { TipoEntidade } from './enums/tipo-entidade.enum'
 import {
   PERFIS_ACESSO,
@@ -92,7 +95,15 @@ export class AccessProvisioningService {
       return
     }
 
-    await this._revogarUsuarioFilial(ctx, ctx.CD_Usuario)
+    if (this._resolverAlocacoesAtivas(ctx).length > 0) {
+      await this._sincronizarUsuarioFilialAluno(ctx, ctx.CD_Usuario)
+    } else if (this._deveRevogarUsuarioFilialNoCancelamentoAluno(ctx)) {
+      await this._revogarUsuarioFilial(ctx, ctx.CD_Usuario)
+    } else {
+      this.logger.log(
+        `[Revogação] Usuário-filial de ${ctx.CD_Usuario} preservado por matrícula extra ativa`,
+      )
+    }
 
     if (this._deveInativarUsuarioNoCancelamento(ctx)) {
       const result = await this.totvsService.inativarUsuario(ctx.CD_Usuario)
@@ -233,6 +244,16 @@ export class AccessProvisioningService {
       (!ctx.IN_Existe_Matricula_Extra ||
         (!!ctx.IN_Inativo_Extra && !!ctx.IN_Existe_Matricula_Extra))
     )
+  }
+
+  private _deveRevogarUsuarioFilialNoCancelamentoAluno(
+    ctx: PessoaAcessoContext,
+  ): boolean {
+    return !ctx.IN_Existe_Matricula_Extra || !!ctx.IN_Inativo_Extra
+  }
+
+  private _deveSanearUsuarioFilialAluno(ctx: PessoaAcessoContext): boolean {
+    return !ctx.IN_Existe_Matricula_Extra || !!ctx.IN_Inativo_Extra
   }
 
   private _deveRemoverPerfilAlunoNoCancelamento(
@@ -377,12 +398,21 @@ export class AccessProvisioningService {
 
   /**
    * Cenário A: verifica existência do usuário, cria ou ativa conforme necessário
-   * e então o vincula à pessoa.
+   * e então o vincula à pessoa quando houver CD_Pessoa. Responsável financeiro
+   * vindo apenas de CFO pode seguir por CPF sem vínculo em PPESSOA.
    */
   private async _criarOuAtivarEVincular(
     ctx: PessoaAcessoContext,
     cdUsuarioCorreto: string,
   ): Promise<any> {
+    const podeSeguirSemPessoa = this._podeProvisionarResponsavelSemPessoa(ctx)
+
+    if (!this._hasText(ctx.CD_Pessoa) && !podeSeguirSemPessoa) {
+      throw new Error(
+        `[Usuário] CD_Pessoa ausente para vincular usuário ${cdUsuarioCorreto}`,
+      )
+    }
+
     const usuarioExistente =
       await this.totvsService.verificarUsuario(cdUsuarioCorreto)
 
@@ -407,6 +437,13 @@ export class AccessProvisioningService {
         cdUsuarioCorreto,
         usuarioExistente,
       )
+    }
+
+    if (podeSeguirSemPessoa) {
+      this.logger.warn(
+        `[Usuário] Usuário ${cdUsuarioCorreto} garantido sem vínculo em PPESSOA: responsável financeiro sem CD_Pessoa resolvido`,
+      )
+      return await this.totvsService.verificarUsuario(cdUsuarioCorreto)
     }
 
     const resultVincular = await this.totvsService.vincularUsuarioPessoa(
@@ -493,7 +530,11 @@ export class AccessProvisioningService {
       return
     }
 
-    if (ctx.IN_Responsavel && ctx.CD_Alocacoes && ctx.CD_Alocacoes.length > 0) {
+    if (
+      ctx.IN_Responsavel &&
+      ((ctx.CD_Alocacoes && ctx.CD_Alocacoes.length > 0) ||
+        this._resolverAlocacoesAtivas(ctx).length > 0)
+    ) {
       await this._garantirUsuarioFiliaisPorAlocacao(ctx, cdUsuario)
       return
     }
@@ -528,33 +569,47 @@ export class AccessProvisioningService {
     ctx: PessoaAcessoContext,
     cdUsuario: string,
   ): Promise<void> {
-    if (ctx.CD_Filial === null || ctx.CD_Filial === undefined) {
+    const alocacoesAtivas = this._resolverAlocacoesAtivas(ctx)
+    const alocacoes =
+      alocacoesAtivas.length > 0
+        ? alocacoesAtivas
+        : ctx.CD_Filial === null || ctx.CD_Filial === undefined
+          ? []
+          : [
+              {
+                CD_Coligada: ctx.CD_Coligada,
+                CD_Filial: ctx.CD_Filial,
+              },
+            ]
+
+    if (alocacoes.length === 0) {
       this.logger.warn(
         `[UsuarioFilial][Aluno] CD_Filial ausente para usuário ${cdUsuario} na coligada ${ctx.CD_Coligada} — etapa ignorada`,
       )
       return
     }
 
-    const alocacoes = [
-      {
-        CD_Coligada: ctx.CD_Coligada,
-        CD_Filial: ctx.CD_Filial,
-      },
-    ]
-
-    await this._revogarUsuarioFilialForaDasAlocacoes(cdUsuario, alocacoes)
-
-    const result = await this.totvsService.garantirUsuarioFilial({
-      cdColigada: ctx.CD_Coligada,
-      cdFilial: ctx.CD_Filial,
-      cdUsuario,
-      inFuncionario: 0,
-    })
-
-    if (result.status === 'Error') {
-      this.logger.warn(
-        `[UsuarioFilial][Aluno] Falha ao garantir acesso usuário-filial para ${cdUsuario} (coligada ${ctx.CD_Coligada}, filial ${ctx.CD_Filial})`,
+    if (alocacoesAtivas.length > 0 || this._deveSanearUsuarioFilialAluno(ctx)) {
+      await this._revogarUsuarioFilialForaDasAlocacoes(cdUsuario, alocacoes)
+    } else {
+      this.logger.log(
+        `[UsuarioFilial][Aluno] Saneamento de filiais de ${cdUsuario} ignorado por matrícula extra ativa`,
       )
+    }
+
+    for (const alocacao of alocacoes) {
+      const result = await this.totvsService.garantirUsuarioFilial({
+        cdColigada: alocacao.CD_Coligada,
+        cdFilial: alocacao.CD_Filial,
+        cdUsuario,
+        inFuncionario: 0,
+      })
+
+      if (result.status === 'Error') {
+        this.logger.warn(
+          `[UsuarioFilial][Aluno] Falha ao garantir acesso usuário-filial para ${cdUsuario} (coligada ${alocacao.CD_Coligada}, filial ${alocacao.CD_Filial})`,
+        )
+      }
     }
   }
 
@@ -593,7 +648,10 @@ export class AccessProvisioningService {
     ctx: PessoaAcessoContext,
     cdUsuario: string,
   ): Promise<void> {
-    const alocacoes = this._deduplicarAlocacoes(ctx.CD_Alocacoes ?? [])
+    const alocacoes = this._deduplicarAlocacoes([
+      ...this._resolverAlocacoesAtivas(ctx),
+      ...(ctx.CD_Alocacoes ?? []),
+    ])
 
     for (const alocacao of alocacoes) {
       const result = await this.totvsService.garantirUsuarioFilial({
@@ -700,25 +758,20 @@ export class AccessProvisioningService {
     ctx: PessoaAcessoContext,
   ): Array<{ CD_Coligada: number; CD_Filial: number }> {
     return this._deduplicarAlocacoes([
+      ...this._resolverAlocacoesAtivas(ctx),
       ...(ctx.CD_Alocacoes_Responsavel ?? []),
       ...this._resolverAlocacoesAlunoResponsavel(ctx),
-      ...this._resolverAlocacoesExtraResponsavel(ctx),
     ])
-  }
-
-  private _resolverAlocacoesExtraResponsavel(
-    ctx: PessoaAcessoContext,
-  ): Array<{ CD_Coligada: number; CD_Filial: number }> {
-    if (ctx.IN_Matricula_Extra_Ativa_Coligada5 !== 1) {
-      return []
-    }
-
-    return [{ CD_Coligada: 6, CD_Filial: 1 }]
   }
 
   private _resolverAlocacoesAlunoResponsavel(
     ctx: PessoaAcessoContext,
   ): Array<{ CD_Coligada: number; CD_Filial: number }> {
+    const alocacoesAtivas = this._resolverAlocacoesAtivas(ctx)
+    if (alocacoesAtivas.length > 0) {
+      return alocacoesAtivas
+    }
+
     if (ctx.CD_Alocacoes && ctx.CD_Alocacoes.length > 0) {
       return this._deduplicarAlocacoes(ctx.CD_Alocacoes)
     }
@@ -747,6 +800,27 @@ export class AccessProvisioningService {
     }
 
     return [...map.values()]
+  }
+
+  private _resolverAlocacoesAtivas(
+    ctx: PessoaAcessoContext,
+  ): AlocacaoAtivaContext[] {
+    return this._deduplicarAlocacoes(ctx.CD_Alocacoes_Ativas ?? [])
+  }
+
+  private _hasText(value: string | null | undefined): boolean {
+    return typeof value === 'string' && value.trim().length > 0
+  }
+
+  private _podeProvisionarResponsavelSemPessoa(
+    ctx: PessoaAcessoContext,
+  ): boolean {
+    return (
+      !this._hasText(ctx.CD_Pessoa) &&
+      !!ctx.IN_Responsavel &&
+      !!ctx.IN_Responsavel_Financeiro &&
+      !!ctx.CD_CPF
+    )
   }
 
   private _resolverFiliaisResponsavel(ctx: PessoaAcessoContext): number[] {
@@ -1035,9 +1109,17 @@ export class AccessProvisioningService {
   }
 
   private _resolverColigadasPerfil(ctx: PessoaAcessoContext): number[] {
-    const coligadas = [ctx.CD_Coligada]
+    const alocacoesAtivas = this._resolverAlocacoesAtivas(ctx)
+    const coligadas =
+      alocacoesAtivas.length > 0
+        ? alocacoesAtivas.map((alocacao) => alocacao.CD_Coligada)
+        : [ctx.CD_Coligada]
 
-    if (ctx.IN_Responsavel && ctx.IN_Matricula_Extra_Ativa_Coligada5 === 1) {
+    if (
+      alocacoesAtivas.length === 0 &&
+      ctx.IN_Responsavel &&
+      ctx.IN_Matricula_Extra_Ativa_Coligada5 === 1
+    ) {
       coligadas.push(6)
     }
 

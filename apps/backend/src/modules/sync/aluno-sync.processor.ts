@@ -9,6 +9,7 @@ import { PessoaAcessoContext } from './access-provisioning/interfaces/pessoa-ace
 import { AlunoTotvsDto } from '../integrations/totvs/dto/aluno-totvs.dto'
 import { AlunoCancelamentoTotvsDto } from '../integrations/totvs/dto/aluno-cancelamento-totvs.dto'
 import { ResponsavelSyncService } from './responsavel-sync.service'
+import { parseAlocacoesAtivasJson } from './utils/alocacoes-ativas'
 
 export interface ColigadaSyncJobData {
   periodoLetivo: string
@@ -38,6 +39,8 @@ export interface WebhookAlunoJobData {
   CD_Periodo_Letivo: string
   CD_Registro_Academico: string
   coligada: ColigadaConfig
+  CD_Coligada_Origem?: number
+  CD_Registro_Academico_Origem?: string
 }
 
 @Processor('aluno-sync')
@@ -136,10 +139,16 @@ export class AlunoSyncProcessor {
 
   @Process('webhook-aluno')
   async handleWebhookAluno(job: Job<WebhookAlunoJobData>): Promise<void> {
-    const { CD_Periodo_Letivo, CD_Registro_Academico, coligada } = job.data
+    const {
+      CD_Periodo_Letivo,
+      CD_Registro_Academico,
+      CD_Registro_Academico_Origem,
+      CD_Coligada_Origem,
+      coligada,
+    } = await this.resolverIdentidadeWebhookAluno(job.data)
 
     this.logger.log(
-      `[Job ${job.id}] [Webhook] Iniciando processamento do aluno ${CD_Registro_Academico} (coligada ${coligada.id}, período ${CD_Periodo_Letivo})`,
+      `[Job ${job.id}] [Webhook] Iniciando processamento do aluno ${CD_Registro_Academico} (coligada ${coligada.id}, origem ${CD_Coligada_Origem ?? coligada.id}/${CD_Registro_Academico_Origem ?? CD_Registro_Academico}, período ${CD_Periodo_Letivo})`,
     )
 
     await this.syncCancelamentoAluno({
@@ -184,6 +193,36 @@ export class AlunoSyncProcessor {
   }
 
   // ─── Métodos privados de sincronização ────────────────────────────────────────
+
+  private async resolverIdentidadeWebhookAluno(
+    data: WebhookAlunoJobData,
+  ): Promise<WebhookAlunoJobData> {
+    if (data.CD_Coligada_Origem !== 6) {
+      return data
+    }
+
+    const identidade = await this.totvsService.fetchIdentidadeAlunoPorRa(
+      data.CD_Periodo_Letivo,
+      6,
+      data.CD_Registro_Academico_Origem ?? data.CD_Registro_Academico,
+    )
+
+    if (!identidade?.CD_Registro_Academico_Coligada5) {
+      this.logger.warn(
+        `[Webhook] RA ${data.CD_Registro_Academico} da coligada 6 sem RA equivalente na coligada 5; usando RA de origem`,
+      )
+      return data
+    }
+
+    this.logger.log(
+      `[Webhook] RA ${data.CD_Registro_Academico} da coligada 6 resolvido para pessoa ${identidade.CD_Pessoa} e RA ${identidade.CD_Registro_Academico_Coligada5} na coligada 5`,
+    )
+
+    return {
+      ...data,
+      CD_Registro_Academico: identidade.CD_Registro_Academico_Coligada5,
+    }
+  }
 
   private async syncColigada(
     periodoLetivo: string,
@@ -260,8 +299,14 @@ export class AlunoSyncProcessor {
       IN_Responsavel: aluno.IN_Responsavel,
       IN_Existe_Matricula_Regular: aluno.IN_Existe_Matricula_Regular,
       IN_Inativo_Regular: aluno.IN_Inativo_Regular,
-      IN_Inativo_Extra: 0,
-      CD_Coligada: coligada.id,
+      IN_Existe_Matricula_Extra: aluno.IN_Existe_Matricula_Extra ?? 0,
+      IN_Inativo_Extra: aluno.IN_Inativo_Extra ?? 0,
+      CD_Alocacoes_Ativas: parseAlocacoesAtivasJson(
+        aluno.JS_Alocacoes_Ativas,
+        this.logger,
+        `Aluno ${ra}`,
+      ),
+      CD_Coligada: aluno.CD_Coligada,
       CD_Filial: aluno.CD_Filial ?? null,
       NM_Dominio_Email_Institucional: coligada.domain,
       TX_Email_Institucional: email,
@@ -360,7 +405,12 @@ export class AlunoSyncProcessor {
       IN_Inativo_Regular: alunoCancelamento.IN_Inativo_Regular,
       IN_Existe_Matricula_Extra: alunoCancelamento.IN_Existe_Matricula_Extra,
       IN_Inativo_Extra: alunoCancelamento.IN_Inativo_Extra,
-      CD_Coligada: coligada.id,
+      CD_Alocacoes_Ativas: parseAlocacoesAtivasJson(
+        alunoCancelamento.JS_Alocacoes_Ativas,
+        this.logger,
+        `CancelamentoAluno ${alunoCancelamento.CD_Registro_Academico}`,
+      ),
+      CD_Coligada: alunoCancelamento.CD_Coligada,
       CD_Filial: alunoCancelamento.CD_Filial ?? null,
       NM_Dominio_Email_Institucional: coligada.domain,
       TX_Email_Institucional: email,

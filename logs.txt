@@ -1,0 +1,156 @@
+[7:58:49 AM] Starting compilation in watch mode...
+
+[7:59:13 AM] Found 0 errors. Watching for file changes.
+
+[07:59:16.631] INFO (1649351): Starting Nest application... {"context":"NestFactory"}
+[07:59:16.632] INFO (1649351): AppLoggerModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): PrismaModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): BullModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): AppModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): GoogleModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): DiscoveryModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): LoggerModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): TotvsModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): BullModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): ScheduleModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): AccessProvisioningModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): BullModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): BullModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): SyncModule dependencies initialized {"context":"InstanceLoader"}
+[07:59:16.632] INFO (1649351): AlunoSyncController {/}: {"context":"RoutesResolver"}
+[07:59:16.632] INFO (1649351): Mapped {/sync/alunos, POST} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): Mapped {/sync/alunos/cancelamentos, POST} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): Mapped {/sync/alunos/cancelamentos/aluno, POST} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): Mapped {/webhooks/alunos, POST} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): ResponsavelSyncController {/}: {"context":"RoutesResolver"}
+[07:59:16.632] INFO (1649351): Mapped {/sync/responsaveis, POST} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): Mapped {/sync/responsaveis/responsavel, POST} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): Mapped {/sync/responsaveis/cancelamentos, POST} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): Mapped {/sync/responsaveis/cancelamentos/responsavel, POST} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): TotvsController {/totvs}: {"context":"RoutesResolver"}
+[07:59:16.632] INFO (1649351): Mapped {/totvs/usuario/:codigo, GET} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): GoogleController {/google}: {"context":"RoutesResolver"}
+[07:59:16.632] INFO (1649351): Mapped {/google/verify-gmail-account/:email, GET} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): Mapped {/google/suspend-gmail-account/:email/:coligada, POST} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): Mapped {/google/activate-gmail-account/:email/:coligada, POST} route {"context":"RouterExplorer"}
+[07:59:16.632] INFO (1649351): Nest application successfully started {"context":"NestApplication"}
+🚀 ~ AlunoSyncController ~ triggerWebhookAluno ~ body: {
+  CD_Registro_Academico: '2027100003',
+  CD_Coligada: 1,
+  CD_Periodo_Letivo: ''
+}
+🚀 ~ AlunoSyncController ~ triggerWebhookAluno ~ body: {
+  CD_Registro_Academico: '2027100003',
+  CD_Coligada: 1,
+  CD_Periodo_Letivo: ''
+}
+[08:03:06.962] INFO (1649351): Webhook de aluno recebido para RA 2027100003 {"req":{"id":"9e05872d-dc55-46b2-b555-024c19d6d702","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":39918},"context":"AlunoSyncController"}
+[08:03:06.962] INFO (1649351): Adicionando job de webhook para aluno 2027100003 (coligada 1, período 2026) {"req":{"id":"9e05872d-dc55-46b2-b555-024c19d6d702","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":39918},"context":"AlunoSyncService"}
+[08:03:06.971] DEBUG (1649351): Removendo job terminal webhook-aluno:2026:1:2027100003 (completed) antes de reenfileirar {"req":{"id":"9e05872d-dc55-46b2-b555-024c19d6d702","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":39918},"context":"AlunoSyncService"}
+[08:03:06.976] INFO (1649351): Job de webhook do aluno 2027100003 adicionado à fila (ID: webhook-aluno:2026:1:2027100003) {"req":{"id":"9e05872d-dc55-46b2-b555-024c19d6d702","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":39918},"context":"AlunoSyncService"}
+[08:03:06.985] INFO (1649351): request completed {"req":{"id":"9e05872d-dc55-46b2-b555-024c19d6d702","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":39918},"res":{"statusCode":202,"headers":{"x-powered-by":"Express","content-type":"application/json; charset=utf-8","content-length":"112","etag":"W/\"70-7Igi3Gbp8N8wQ0fU/kfAneh8UeY\""}},"responseTime":38}
+[08:03:07.096] INFO (1649351): Webhook de aluno recebido para RA 2027100003 {"req":{"id":"679a8c66-0b6f-41c3-be4c-1a3878b6736d","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":39918},"context":"AlunoSyncController"}
+[08:03:07.096] INFO (1649351): Adicionando job de webhook para aluno 2027100003 (coligada 1, período 2026) {"req":{"id":"679a8c66-0b6f-41c3-be4c-1a3878b6736d","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":39918},"context":"AlunoSyncService"}
+[08:03:07.102] WARN (1649351): Job webhook-aluno:2026:1:2027100003 já existe em estado active; mantendo deduplicação {"req":{"id":"679a8c66-0b6f-41c3-be4c-1a3878b6736d","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":39918},"context":"AlunoSyncService"}
+[08:03:07.102] INFO (1649351): Job de webhook do aluno 2027100003 adicionado à fila (ID: webhook-aluno:2026:1:2027100003) {"req":{"id":"679a8c66-0b6f-41c3-be4c-1a3878b6736d","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":39918},"context":"AlunoSyncService"}
+[08:03:07.103] INFO (1649351): request completed {"req":{"id":"679a8c66-0b6f-41c3-be4c-1a3878b6736d","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":39918},"res":{"statusCode":202,"headers":{"x-powered-by":"Express","content-type":"application/json; charset=utf-8","content-length":"112","etag":"W/\"70-7Igi3Gbp8N8wQ0fU/kfAneh8UeY\""}},"responseTime":8}
+[08:03:06.988] INFO (1649351): [Job webhook-aluno:2026:1:2027100003] [Webhook] Iniciando processamento do aluno 2027100003 (coligada 1, período 2026) {"context":"AlunoSyncProcessor"}
+[08:03:06.988] INFO (1649351): Buscando alunos para cancelamento — coligada solicitada 1, coligada procedure 1, período 2026 {"context":"TotvsService"}
+[08:03:08.200] INFO (1649351): Encontrados 0 aluno(s) para cancelamento na coligada solicitada 1 via procedure 1 {"context":"TotvsService"}
+[08:03:08.200] WARN (1649351): [Cancelamento] Aluno 2027100003 não encontrado para revogação na coligada 1 {"context":"AlunoSyncProcessor"}
+[08:03:08.201] INFO (1649351): Buscando alunos ativos — coligada solicitada 1, coligada procedure 1, período 2026 {"context":"TotvsService"}
+[08:03:20.187] INFO (1649351): Encontrados 1 alunos para coligada solicitada 1 via procedure 1 {"context":"TotvsService"}
+[08:03:20.188] WARN (1649351): [Webhook] Aluno 2027100003 encontrado na procedure de ativação para a coligada 1 {"context":"AlunoSyncProcessor"}
+[08:03:20.188] DEBUG (1649351): [Coligada 1] Processando aluno 2027100003 {"context":"AlunoSyncProcessor"}
+[08:03:20.188] WARN (1649351): [Google] Provisionamento de Gmail de aluno ignorado para 2027100003@aluno.cel.g12.br: NODE_ENV=development {"context":"GoogleService"}
+[08:03:20.188] INFO (1649351): [Google] 2027100003@aluno.cel.g12.br → skipped_non_production {"context":"AlunoSyncProcessor"}
+[08:03:20.188] INFO (1649351): [Provisioning] Iniciando para 2027100003 (ALUNO, coligada 1) {"context":"AccessProvisioningService"}
+[08:03:20.189] INFO (1649351): Verificando existência do usuário 2027100003 no TOTVS {"context":"TotvsService"}
+[08:03:20.765] INFO (1649351): Verificando existência do usuário 2027100003 no TOTVS {"context":"TotvsService"}
+[08:03:21.081] INFO (1649351): [UsuarioFilial][Aluno] Saneamento de filiais de 2027100003 ignorado por matrícula extra ativa {"context":"AccessProvisioningService"}
+[08:03:21.082] INFO (1649351): [UsuarioFilial] Garantindo acesso para usuário 2027100003 (coligada 1, filial 7, acesso 1) {"context":"TotvsService"}
+[08:03:21.383] INFO (1649351): [UsuarioFilial] Acesso já consistente para 2027100003 na PK 1$_$1$_$7$_$2027100003 — skip {"context":"TotvsService"}
+[08:03:21.385] INFO (1649351): Buscando usuário 2027100003 no sistema S {"context":"TotvsService"}
+[08:03:21.691] INFO (1649351): [Perfis] [Sistema S] Usuário 2027100003 já possui todos os perfis na coligada 1 — skip {"context":"AccessProvisioningService"}
+[08:03:21.691] INFO (1649351): Buscando usuário 2027100003 no sistema L {"context":"TotvsService"}
+[08:03:22.015] INFO (1649351): [Perfis] [Sistema L] Usuário 2027100003 já possui todos os perfis na coligada 1 — skip {"context":"AccessProvisioningService"}
+[08:03:22.015] INFO (1649351): [Provisioning] Concluído para 2027100003 {"context":"AccessProvisioningService"}
+[08:03:22.015] INFO (1649351): [Job webhook-aluno:2026:1:2027100003] [Webhook] Enfileirando responsáveis após reconciliação do aluno 2027100003 {"context":"AlunoSyncProcessor"}
+[08:03:22.021] DEBUG (1649351): Removendo job terminal cancelamento-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003 (completed) antes de reenfileirar {"context":"ResponsavelSyncService"}
+[08:03:22.024] INFO (1649351): Job unitário global de responsável adicionado (ID: cancelamento-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003) {"context":"ResponsavelSyncService"}
+[08:03:22.027] DEBUG (1649351): [Job cancelamento-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003] Cancelamento unitário global de responsável (pessoa NULL, cpf NULL, origem WEBHOOK) {"context":"ResponsavelSyncProcessor"}
+[08:03:22.028] INFO (1649351): Buscando responsáveis para cancelamento — período 2026 {"context":"TotvsService"}
+[08:03:22.032] DEBUG (1649351): Removendo job terminal sync-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003 (failed) antes de reenfileirar {"context":"ResponsavelSyncService"}
+[08:03:22.036] INFO (1649351): Job unitário de concessão de responsável adicionado (ID: sync-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003) {"context":"ResponsavelSyncService"}
+[08:03:22.036] INFO (1649351): [Job webhook-aluno:2026:1:2027100003] [Webhook] Processamento concluído para aluno 2027100003 {"context":"AlunoSyncProcessor"}
+[08:03:22.038] DEBUG (1649351): [Job sync-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003] Concessão unitária de responsável (pessoa NULL, cpf NULL, ra 2027100003, origem WEBHOOK) {"context":"ResponsavelSyncProcessor"}
+[08:03:22.039] INFO (1649351): Buscando responsáveis para ativação — período 2026 {"context":"TotvsService"}
+[08:04:06.879] INFO (1649351): Encontrados 0 linha(s) de responsável para cancelamento {"context":"TotvsService"}
+[08:04:06.879] WARN (1649351): [CancelamentoResponsavel] Responsável não encontrado globalmente (pessoa NULL, cpf NULL) {"context":"ResponsavelSyncProcessor"}
+🚀 ~ AlunoSyncController ~ triggerWebhookAluno ~ body: {
+  CD_Registro_Academico: '2027100003',
+  CD_Coligada: 1,
+  CD_Periodo_Letivo: ''
+}
+[08:04:47.143] INFO (1649351): [Job webhook-aluno:2026:1:2027100003] [Webhook] Iniciando processamento do aluno 2027100003 (coligada 1, período 2026) {"context":"AlunoSyncProcessor"}
+[08:04:47.143] INFO (1649351): Buscando alunos para cancelamento — coligada solicitada 1, coligada procedure 1, período 2026 {"context":"TotvsService"}
+[08:04:47.137] INFO (1649351): Webhook de aluno recebido para RA 2027100003 {"req":{"id":"c676ecf2-a573-45c9-a5d3-ce7d78b2486d","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","expect":"100-continue","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":41478},"context":"AlunoSyncController"}
+[08:04:47.137] INFO (1649351): Adicionando job de webhook para aluno 2027100003 (coligada 1, período 2026) {"req":{"id":"c676ecf2-a573-45c9-a5d3-ce7d78b2486d","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","expect":"100-continue","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":41478},"context":"AlunoSyncService"}
+[08:04:47.140] DEBUG (1649351): Removendo job terminal webhook-aluno:2026:1:2027100003 (completed) antes de reenfileirar {"req":{"id":"c676ecf2-a573-45c9-a5d3-ce7d78b2486d","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","expect":"100-continue","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":41478},"context":"AlunoSyncService"}
+[08:04:47.141] INFO (1649351): Job de webhook do aluno 2027100003 adicionado à fila (ID: webhook-aluno:2026:1:2027100003) {"req":{"id":"c676ecf2-a573-45c9-a5d3-ce7d78b2486d","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","expect":"100-continue","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":41478},"context":"AlunoSyncService"}
+[08:04:47.142] INFO (1649351): request completed {"req":{"id":"c676ecf2-a573-45c9-a5d3-ce7d78b2486d","method":"POST","url":"/webhooks/alunos","query":{},"params":{"0":"webhooks/alunos"},"headers":{"host":"desired-cardinal-prime.ngrok-free.app","user-agent":"RM/12.1.2602.196 (.NET Framework 4.8.4795.0)","content-length":"88","content-type":"application/json","expect":"100-continue","x-forwarded-for":"201.148.210.185","x-forwarded-host":"desired-cardinal-prime.ngrok-free.app","x-forwarded-proto":"https","accept-encoding":"gzip"},"remoteAddress":"::ffff:127.0.0.1","remotePort":41478},"res":{"statusCode":202,"headers":{"x-powered-by":"Express","content-type":"application/json; charset=utf-8","content-length":"112","etag":"W/\"70-7Igi3Gbp8N8wQ0fU/kfAneh8UeY\""}},"responseTime":6}
+[08:04:47.561] INFO (1649351): Encontrados 1 aluno(s) para cancelamento na coligada solicitada 1 via procedure 1 {"context":"TotvsService"}
+[08:04:47.561] DEBUG (1649351): [Cancelamento] Processando 2027100003 (WEBHOOK) {"context":"AlunoSyncProcessor"}
+[08:04:47.562] INFO (1649351): [Revogação] Iniciando para 2027100003 (ALUNO, coligada 1) {"context":"AccessProvisioningService"}
+[08:04:47.562] WARN (1649351): [Google] Cancelamento de Gmail institucional de aluno ignorado para 2027100003@aluno.cel.g12.br: NODE_ENV=development {"context":"GoogleService"}
+[08:04:47.562] INFO (1649351): [Revogação] Gmail 2027100003@aluno.cel.g12.br -> skipped_non_production {"context":"AccessProvisioningService"}
+[08:04:47.563] INFO (1649351): [Revogação] Usuário-filial de 2027100003 preservado por matrícula extra ativa {"context":"AccessProvisioningService"}
+[08:04:47.563] INFO (1649351): [Revogação] Usuário 2027100003 preservado por regra de negócio {"context":"AccessProvisioningService"}
+[08:04:47.563] INFO (1649351): Buscando alunos ativos — coligada solicitada 1, coligada procedure 1, período 2026 {"context":"TotvsService"}
+[08:04:59.738] INFO (1649351): Encontrados 1 alunos para coligada solicitada 1 via procedure 1 {"context":"TotvsService"}
+[08:04:59.738] WARN (1649351): [Webhook] Aluno 2027100003 encontrado na procedure de ativação para a coligada 1 {"context":"AlunoSyncProcessor"}
+[08:04:59.738] DEBUG (1649351): [Coligada 1] Processando aluno 2027100003 {"context":"AlunoSyncProcessor"}
+[08:04:59.738] INFO (1649351): [Provisioning] Iniciando para 2027100003 (ALUNO, coligada 1) {"context":"AccessProvisioningService"}
+[08:04:59.738] INFO (1649351): Verificando existência do usuário 2027100003 no TOTVS {"context":"TotvsService"}
+[08:05:00.081] INFO (1649351): Verificando existência do usuário 2027100003 no TOTVS {"context":"TotvsService"}
+[08:05:00.404] INFO (1649351): [UsuarioFilial][Aluno] Saneamento de filiais de 2027100003 ignorado por matrícula extra ativa {"context":"AccessProvisioningService"}
+[08:05:00.405] INFO (1649351): [UsuarioFilial] Garantindo acesso para usuário 2027100003 (coligada 1, filial 78, acesso 1) {"context":"TotvsService"}
+[08:05:00.417] WARN (1649351): [UsuarioFilial] Validação prévia bloqueou acesso para 2027100003 (coligada 1, filial 78): GFILIAL não encontrada para coligada/filial {"context":"TotvsService"}
+[08:05:00.417] WARN (1649351): [UsuarioFilial][Aluno] Falha ao garantir acesso usuário-filial para 2027100003 (coligada 1, filial 78) {"context":"AccessProvisioningService"}
+[08:05:00.418] INFO (1649351): Buscando usuário 2027100003 no sistema S {"context":"TotvsService"}
+[08:05:00.728] INFO (1649351): [Perfis] [Sistema S] Usuário 2027100003 já possui todos os perfis na coligada 1 — skip {"context":"AccessProvisioningService"}
+[08:05:00.728] INFO (1649351): Buscando usuário 2027100003 no sistema L {"context":"TotvsService"}
+[08:05:01.062] INFO (1649351): [Perfis] [Sistema L] Usuário 2027100003 já possui todos os perfis na coligada 1 — skip {"context":"AccessProvisioningService"}
+[08:05:01.062] INFO (1649351): [Provisioning] Concluído para 2027100003 {"context":"AccessProvisioningService"}
+[08:05:01.062] INFO (1649351): [Job webhook-aluno:2026:1:2027100003] [Webhook] Enfileirando responsáveis após reconciliação do aluno 2027100003 {"context":"AlunoSyncProcessor"}
+[08:05:01.066] DEBUG (1649351): Removendo job terminal cancelamento-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003 (completed) antes de reenfileirar {"context":"ResponsavelSyncService"}
+[08:05:01.068] INFO (1649351): Job unitário global de responsável adicionado (ID: cancelamento-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003) {"context":"ResponsavelSyncService"}
+[08:05:01.071] DEBUG (1649351): [Job cancelamento-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003] Cancelamento unitário global de responsável (pessoa NULL, cpf NULL, origem WEBHOOK) {"context":"ResponsavelSyncProcessor"}
+[08:05:01.071] INFO (1649351): Buscando responsáveis para cancelamento — período 2026 {"context":"TotvsService"}
+[08:05:01.075] WARN (1649351): Job sync-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003 já existe em estado active; mantendo deduplicação {"context":"ResponsavelSyncService"}
+[08:05:01.075] INFO (1649351): Job unitário de concessão de responsável adicionado (ID: sync-responsavel-unitario:WEBHOOK:2026:PNULL:2027100003) {"context":"ResponsavelSyncService"}
+[08:05:01.075] INFO (1649351): [Job webhook-aluno:2026:1:2027100003] [Webhook] Processamento concluído para aluno 2027100003 {"context":"AlunoSyncProcessor"}
+[08:05:15.098] INFO (1649351): Encontrados 0 linha(s) de responsável para cancelamento {"context":"TotvsService"}
+[08:05:15.098] WARN (1649351): [CancelamentoResponsavel] Responsável não encontrado globalmente (pessoa NULL, cpf NULL) {"context":"ResponsavelSyncProcessor"}
+[08:07:48.294] INFO (1649351): Encontrados 3 linha(s) de responsável para ativação {"context":"TotvsService"}
+[08:07:48.295] INFO (1649351): [Provisioning] Iniciando para 36625390046 (RESPONSAVEL, coligada 1) {"context":"AccessProvisioningService"}
+[08:07:48.295] INFO (1649351): Verificando existência do usuário 36625390046 no TOTVS {"context":"TotvsService"}
+[08:07:48.660] INFO (1649351): Verificando existência do usuário 36625390046 no TOTVS {"context":"TotvsService"}
+[08:07:49.005] INFO (1649351): [UsuarioFilial] Buscando acessos ativos do usuário 36625390046 {"context":"TotvsService"}
+[08:07:49.015] INFO (1649351): [UsuarioFilial] 0 acesso(s) ativo(s) encontrado(s) para 36625390046 {"context":"TotvsService"}
+[08:07:49.015] INFO (1649351): [UsuarioFilial] Garantindo acesso para usuário 36625390046 (coligada 1, filial 7, acesso 1) {"context":"TotvsService"}
+[08:07:49.651] INFO (1649351): [UsuarioFilial] Acesso garantido para 36625390046 na coligada 1, filial 7 {"context":"TotvsService"}
+[08:07:49.651] INFO (1649351): Buscando usuário 36625390046 no sistema S {"context":"TotvsService"}
+[08:07:50.007] INFO (1649351): [Perfis] [Sistema S] Usuário 36625390046 já possui todos os perfis na coligada 1 — skip {"context":"AccessProvisioningService"}
+[08:07:50.007] INFO (1649351): [Provisioning] Concluído para 36625390046 {"context":"AccessProvisioningService"}
+[08:07:50.008] INFO (1649351): [Provisioning] Iniciando para 81983796069 (RESPONSAVEL, coligada 1) {"context":"AccessProvisioningService"}
+[08:07:50.008] INFO (1649351): Verificando existência do usuário 81983796069 no TOTVS {"context":"TotvsService"}
+[08:07:50.368] INFO (1649351): Verificando existência do usuário 81983796069 no TOTVS {"context":"TotvsService"}
+[08:07:50.715] INFO (1649351): [UsuarioFilial] Buscando acessos ativos do usuário 81983796069 {"context":"TotvsService"}
+[08:07:50.722] INFO (1649351): [UsuarioFilial] 0 acesso(s) ativo(s) encontrado(s) para 81983796069 {"context":"TotvsService"}
+[08:07:50.722] INFO (1649351): [UsuarioFilial] Garantindo acesso para usuário 81983796069 (coligada 1, filial 7, acesso 1) {"context":"TotvsService"}
+[08:07:51.370] INFO (1649351): [UsuarioFilial] Acesso garantido para 81983796069 na coligada 1, filial 7 {"context":"TotvsService"}
+[08:07:51.370] INFO (1649351): Buscando usuário 81983796069 no sistema S {"context":"TotvsService"}
+[08:07:51.720] INFO (1649351): [Perfis] [Sistema S] Usuário 81983796069 já possui todos os perfis na coligada 1 — skip {"context":"AccessProvisioningService"}
+[08:07:51.720] INFO (1649351): [Provisioning] Concluído para 81983796069 {"context":"AccessProvisioningService"}
+[08:07:51.720] WARN (1649351): [ConcessaoResponsavel] Responsável sem CD_Pessoa ignorado para evitar vínculo TOTVS inválido (cpf 42848049014, coligada 1) {"context":"ResponsavelSyncProcessor"}

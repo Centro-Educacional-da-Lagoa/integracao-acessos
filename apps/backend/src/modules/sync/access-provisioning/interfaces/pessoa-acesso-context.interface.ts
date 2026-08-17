@@ -6,6 +6,12 @@
  * Uma mesma pessoa pode ter mais de um papel ativo simultaneamente
  * (ex: IN_Aluno=1 e IN_Funcionario=1). Os campos IN_* são independentes.
  */
+export interface AlocacaoAtivaContext {
+  CD_Coligada: number
+  CD_Filial: number
+  TP_Matricula?: 'REGULAR' | 'EXTRA'
+}
+
 export interface PessoaAcessoContext {
   /** Origem do fluxo de revogação para evitar mistura de regras entre entidades */
   TP_Origem_Revogacao?: 'ALUNO' | 'RESPONSAVEL'
@@ -80,6 +86,9 @@ export interface PessoaAcessoContext {
 
   /** Lista de combinações coligada+filial permitidas para operações agregadas */
   CD_Alocacoes?: Array<{ CD_Coligada: number; CD_Filial: number }>
+
+  /** Lista de combinações coligada+filial com matrícula ativa real (regular ou extra) */
+  CD_Alocacoes_Ativas?: AlocacaoAtivaContext[]
 
   /** Lista de combinações coligada+filial dos filhos vinculados ao responsável */
   CD_Alocacoes_Responsavel?: Array<{ CD_Coligada: number; CD_Filial: number }>

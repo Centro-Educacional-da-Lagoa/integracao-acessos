@@ -23,6 +23,7 @@ export const ResponsavelCancelamentoTotvsSchema = z.object({
   IN_Filiacao: z.number().int().min(0).max(1),
   IN_Responsavel_Academico: z.number().int().min(0).max(1),
   IN_Responsavel_Financeiro: z.number().int().min(0).max(1),
+  JS_Alocacoes_Ativas: z.string().nullable().optional(),
 })
 
 export type ResponsavelCancelamentoTotvsDto = z.infer<

@@ -37,6 +37,15 @@ export const AlunoTotvsSchema = z.object({
   /** 1 = matrícula regular inativa */
   IN_Inativo_Regular: z.number().int().min(0).max(1),
 
+  /** 1 = possui matrícula extra no período */
+  IN_Existe_Matricula_Extra: z.number().int().min(0).max(1).optional(),
+
+  /** 1 = matrícula extra inativa */
+  IN_Inativo_Extra: z.number().int().min(0).max(1).optional(),
+
+  /** JSON com coligadas/filiais de matrículas ativas reais */
+  JS_Alocacoes_Ativas: z.string().nullable().optional(),
+
   /** 1 = a pessoa também é funcionário */
   IN_Funcionario: z.number().int().min(0).max(1),
 

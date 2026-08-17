@@ -65,7 +65,8 @@ BEGIN
 		, IN_Inativo_Extra				int					not null
 		, IN_Funcionario				int					null
 		, IN_Responsavel				int					null
-	)
+		, JS_Alocacoes_Ativas			varchar(max) collate database_default	null
+		)
 
 	insert into #tmp_aluno_cancelado_base
 		( CD_Coligada
@@ -87,8 +88,9 @@ BEGIN
 		, IN_Existe_Matricula_Extra
 		, IN_Inativo_Extra
 		, IN_Funcionario
-		, IN_Responsavel
-		)
+			, IN_Responsavel
+			, JS_Alocacoes_Ativas
+			)
 	exec [dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso]
 		 @prm_cd_periodo_letivo = @prm_cd_periodo_letivo
 		, @prm_cd_coligada = 1
@@ -114,8 +116,9 @@ BEGIN
 		, IN_Existe_Matricula_Extra
 		, IN_Inativo_Extra
 		, IN_Funcionario
-		, IN_Responsavel
-		)
+			, IN_Responsavel
+			, JS_Alocacoes_Ativas
+			)
 	exec [dbo].[PR_MGA_Consulta_Aluno_Cancelamento_Acesso]
 		 @prm_cd_periodo_letivo = @prm_cd_periodo_letivo
 		, @prm_cd_coligada = 5
@@ -135,8 +138,9 @@ BEGIN
 		, IN_Existe_Matricula_Regular	int					not null
 		, IN_Inativo_Regular			int					not null
 		, IN_Existe_Matricula_Extra		int					not null
-		, IN_Inativo_Extra				int					not null
-	)
+			, IN_Inativo_Extra				int					not null
+			, TP_Matricula					varchar(20) collate database_default	null
+		)
 
 	/*
 	  VINCULO: FILIACAO
@@ -153,9 +157,10 @@ BEGIN
 		, IN_Existe_Matricula_Regular
 		, IN_Inativo_Regular
 		, IN_Existe_Matricula_Extra
-		, IN_Inativo_Extra
-		)
-	select	 case when acd.CD_Coligada = 6 then 5 else acd.CD_Coligada end as CD_Coligada
+			, IN_Inativo_Extra
+			, TP_Matricula
+			)
+	select	 acd.CD_Coligada
 			, acd.CD_Filial
 			, acd.CD_Pessoa
 			, acd.CD_Registro_Academico
@@ -171,6 +176,7 @@ BEGIN
 			, acd.IN_Inativo_Regular
 			, acd.IN_Existe_Matricula_Extra
 			, acd.IN_Inativo_Extra
+			, acd.NM_Tipo_Matricula
 	from	#tmp_aluno_cancelado_base	as acd
 	inner	join dbo.vfiliacao			as vfi (nolock)
 	  on	vfi.codpessoafilho = acd.CD_Pessoa
@@ -192,9 +198,10 @@ BEGIN
 		, IN_Existe_Matricula_Regular
 		, IN_Inativo_Regular
 		, IN_Existe_Matricula_Extra
-		, IN_Inativo_Extra
-		)
-	select	 case when acd.CD_Coligada = 6 then 5 else acd.CD_Coligada end as CD_Coligada
+			, IN_Inativo_Extra
+			, TP_Matricula
+			)
+	select	 acd.CD_Coligada
 			, acd.CD_Filial
 			, acd.CD_Pessoa
 			, acd.CD_Registro_Academico
@@ -210,6 +217,7 @@ BEGIN
 			, acd.IN_Inativo_Regular
 			, acd.IN_Existe_Matricula_Extra
 			, acd.IN_Inativo_Extra
+			, acd.NM_Tipo_Matricula
 	from	#tmp_aluno_cancelado_base	as acd
 	inner	join dbo.saluno				as aln (nolock)
 	  on	aln.codcoligada = acd.CD_Coligada
@@ -232,9 +240,10 @@ BEGIN
 		, IN_Existe_Matricula_Regular
 		, IN_Inativo_Regular
 		, IN_Existe_Matricula_Extra
-		, IN_Inativo_Extra
-		)
-	select	 case when acd.CD_Coligada = 6 then 5 else acd.CD_Coligada end as CD_Coligada
+			, IN_Inativo_Extra
+			, TP_Matricula
+			)
+	select	 acd.CD_Coligada
 			, acd.CD_Filial
 			, acd.CD_Pessoa
 			, acd.CD_Registro_Academico
@@ -246,6 +255,7 @@ BEGIN
 			, acd.IN_Inativo_Regular
 			, acd.IN_Existe_Matricula_Extra
 			, acd.IN_Inativo_Extra
+			, acd.NM_Tipo_Matricula
 	from	#tmp_aluno_cancelado_base	as acd
 	inner	join dbo.saluno				as aln (nolock)
 	  on	aln.codcoligada = acd.CD_Coligada
@@ -368,7 +378,7 @@ BEGIN
 		, CD_CodCfo
 		)
 	select	distinct
-			case when mtpl.codcoligada = 6 then 5 else mtpl.codcoligada end as CD_Coligada
+			mtpl.codcoligada as CD_Coligada
 			, mtpl.codfilial as CD_Filial
 			, alno.codpessoa
 			, alno.codpessoaraca
@@ -535,7 +545,7 @@ BEGIN
 		, CD_Filial_Aluno
 		, CD_Pessoa_Responsavel
 		)
-	select	distinct case when mtpl.codcoligada = 6 then 5 else mtpl.codcoligada end as CD_Coligada
+		select	distinct mtpl.codcoligada as CD_Coligada
 			, mtpl.codfilial as CD_Filial_Aluno
 			, alno.codpessoa
 	from	dbo.saluno						as alno (nolock)
@@ -619,9 +629,18 @@ BEGIN
 			, ctx.IN_Inativo_Extra
 			, case when func.codpessoa is not null then 1 else 0 end as IN_Funcionario
 			, case when alu.CD_Pessoa_Responsavel is not null then 1 else 0 end as IN_Aluno
-			, ctx.IN_Filiacao
-			, ctx.IN_Responsavel_Academico
-			, ctx.IN_Responsavel_Financeiro
+				, ctx.IN_Filiacao
+				, ctx.IN_Responsavel_Academico
+				, ctx.IN_Responsavel_Financeiro
+				, (
+					select	distinct
+							 rsa2.CD_Coligada
+							, rsa2.CD_Filial
+							, rsa2.TP_Matricula
+					from	#tmp_resp_aluno as rsa2
+					where	rsa2.CD_Agregador_Responsavel = ctx.CD_Agregador_Responsavel
+					for json path
+				  ) as JS_Alocacoes_Ativas
 	from	cte_resp					as ctx
 	inner	join #tmp_resp_aluno			as rsa
 	  on	rsa.CD_Coligada = ctx.CD_Coligada
@@ -652,9 +671,10 @@ BEGIN
 	  and	alu.CD_Pessoa_Responsavel = ctx.CD_Pessoa_Responsavel
 	where	( @prm_cd_pessoa is null or pss.codigo = @prm_cd_pessoa )
 	  and	( @vr_cd_cpf_filtro is null or ctx.CD_CPF_Responsavel collate database_default = @vr_cd_cpf_filtro collate database_default )
-	group	by ctx.CD_Coligada
-			, ctx.CD_Filial
-			, case when alu.CD_Pessoa_Responsavel is not null then ctx.CD_Coligada else null end
+		group	by ctx.CD_Coligada
+				, ctx.CD_Filial
+				, ctx.CD_Agregador_Responsavel
+				, case when alu.CD_Pessoa_Responsavel is not null then ctx.CD_Coligada else null end
 			, alu.CD_Filial_Aluno
 			, isnull(ctx.CD_Pessoa_Responsavel, pss.codigo)
 			, pss.codusuario

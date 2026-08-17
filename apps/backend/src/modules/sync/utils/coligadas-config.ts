@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common'
 import { ColigadaConfig } from '../interfaces/coligada-config.interface'
 
-const COLIGADA_ALIAS_MAP = new Map<number, number>([[6, 5]])
+const COLIGADA_ALIAS_MAP = new Map<number, number>()
 
 const COLIGADAS_CONFIG: ColigadaConfig[] = [
   {

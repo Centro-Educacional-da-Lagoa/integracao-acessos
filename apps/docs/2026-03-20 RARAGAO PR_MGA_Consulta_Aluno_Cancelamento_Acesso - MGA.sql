@@ -546,7 +546,58 @@ begin
 
 end
 
-drop table #tmp_cex
+	drop table #tmp_cex
+
+	create table #tmp_alocacao_ativa
+	(
+		CD_Pessoa						int											not null
+		, CD_Coligada					smallint									not null
+		, CD_Filial						smallint									not null
+		, TP_Matricula					varchar(20) collate database_default		not null
+	)
+
+	insert	into #tmp_alocacao_ativa
+			( CD_Pessoa
+			, CD_Coligada
+			, CD_Filial
+			, TP_Matricula
+			)
+	select	distinct
+			 aln.codpessoa							as CD_Pessoa
+			, mtpl.codcoligada						as CD_Coligada
+			, mtpl.codfilial						as CD_Filial
+			, case
+					when hblt.complemento = 'CEX' then 'EXTRA'
+					else 'REGULAR'
+			  end									as TP_Matricula
+	from	dbo.smatricpl							as mtpl	with (nolock)
+	inner	join dbo.spletivo						as prlt	with (nolock)
+	  on	mtpl.codcoligada = prlt.codcoligada
+	  and	mtpl.idperlet = prlt.idperlet
+	inner	join dbo.shabilitacaofilial				as hbfl	with (nolock)
+	  on	mtpl.codcoligada = hbfl.codcoligada
+	  and	mtpl.idhabilitacaofilial = hbfl.idhabilitacaofilial
+	inner	join dbo.shabilitacao					as hblt	with (nolock)
+	  on	hbfl.codcoligada = hblt.codcoligada
+	  and	hbfl.codcurso = hblt.codcurso
+	  and	hbfl.codhabilitacao = hblt.codhabilitacao
+	inner	join dbo.saluno							as aln		with (nolock)
+	  on	mtpl.codcoligada = aln.codcoligada
+	  and	mtpl.ra = aln.ra
+	inner	join dbo.sstatus						as stt		with (nolock)
+	  on	mtpl.codcoligada = stt.codcoligada
+	  and	mtpl.codstatus = stt.codstatus
+	where	prlt.codperlet = @prm_cd_periodo_letivo
+	  and	hblt.complemento in ( 'EI', 'EF1', 'EF2', 'EM', 'CEX' )
+	  and	stt.descricao not in ( 'Cancelado', 'Falecido', 'Pré-Matrícula Nula (Cancelado)' )
+	  and	exists
+			(
+				select	1
+				from	#tmp_aluno_cancelado as tmp
+				where	tmp.CD_Pessoa = aln.codpessoa
+			)
+
+	create index IX_tmp_alocacao_ativa_pes on #tmp_alocacao_ativa ( CD_Pessoa )
 
 
 
@@ -646,7 +697,15 @@ drop table #tmp_cex
 								  and	prlt.codperlet = @prm_cd_periodo_letivo
 							) then 1
 							  else 0 
-			  end				as IN_Responsavel
+				  end				as IN_Responsavel
+				, (
+					select	 alv.CD_Coligada
+							, alv.CD_Filial
+							, alv.TP_Matricula
+					from	#tmp_alocacao_ativa as alv
+					where	alv.CD_Pessoa = tmp.CD_Pessoa
+					for json path
+				  )					as JS_Alocacoes_Ativas
 	from		#tmp_aluno_cancelado		as tmp (nolock)
 	left	join dbo.pfunc				as func (nolock)
 	  on	tmp.cd_pessoa = func.codpessoa

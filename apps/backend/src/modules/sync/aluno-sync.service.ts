@@ -13,7 +13,6 @@ import { AlunoTotvsDto } from '../integrations/totvs/dto/aluno-totvs.dto'
 import {
   getColigadaConfigById,
   listColigadasConfig,
-  normalizeColigadaId,
 } from './utils/coligadas-config'
 
 @Injectable()
@@ -287,7 +286,7 @@ export class AlunoSyncService {
     TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO' | 'WEBHOOK'
   }): Promise<void> {
     const coligada = getColigadaConfigById(data.CD_Coligada)
-    const CD_Coligada = normalizeColigadaId(data.CD_Coligada)
+    const CD_Coligada = data.CD_Coligada
 
     this.logger.log(
       `Adicionando job de cancelamento para aluno ${data.CD_Registro_Academico}`,
@@ -327,7 +326,8 @@ export class AlunoSyncService {
     CD_Coligada?: number
     CD_Periodo_Letivo?: string | null
   }): Promise<void> {
-    const CD_Periodo_Letivo = data.CD_Periodo_Letivo ?? process.env.PERIODO_LETIVO
+    const CD_Periodo_Letivo =
+      data.CD_Periodo_Letivo ?? process.env.PERIODO_LETIVO
     if (!CD_Periodo_Letivo) {
       throw new BadRequestException(
         'CD_Periodo_Letivo não informado e PERIODO_LETIVO não definido.',
@@ -337,9 +337,10 @@ export class AlunoSyncService {
     const coligada = data.CD_Coligada
       ? getColigadaConfigById(data.CD_Coligada)
       : this.resolveColigadaFromConfig()
+    const CD_Coligada_Origem = data.CD_Coligada ?? coligada.id
 
     this.logger.log(
-      `Adicionando job de webhook para aluno ${data.CD_Registro_Academico} (coligada ${coligada.id}, período ${CD_Periodo_Letivo})`,
+      `Adicionando job de webhook para aluno ${data.CD_Registro_Academico} (coligada ${coligada.id}, origem ${CD_Coligada_Origem}, período ${CD_Periodo_Letivo})`,
     )
 
     const job = await this.addAlunoSyncJob(
@@ -348,6 +349,8 @@ export class AlunoSyncService {
         CD_Periodo_Letivo,
         CD_Registro_Academico: data.CD_Registro_Academico,
         coligada,
+        CD_Coligada_Origem,
+        CD_Registro_Academico_Origem: data.CD_Registro_Academico,
       } as WebhookAlunoJobData,
       {
         attempts: 3,
@@ -357,7 +360,7 @@ export class AlunoSyncService {
         },
         jobId: this.buildAlunoWebhookJobId({
           CD_Periodo_Letivo,
-          CD_Coligada: coligada.id,
+          CD_Coligada: CD_Coligada_Origem,
           CD_Registro_Academico: data.CD_Registro_Academico,
         }),
         removeOnComplete: AlunoSyncService.REMOVE_ON_COMPLETE,

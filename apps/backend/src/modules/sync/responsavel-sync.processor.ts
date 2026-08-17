@@ -6,6 +6,10 @@ import { AccessProvisioningService } from './access-provisioning/access-provisio
 import { PessoaAcessoContext } from './access-provisioning/interfaces/pessoa-acesso-context.interface'
 import { ResponsavelCancelamentoTotvsDto } from '../integrations/totvs/dto/responsavel-cancelamento-totvs.dto'
 import { ResponsavelAtivacaoTotvsDto } from '../integrations/totvs/dto/responsavel-ativacao-totvs.dto'
+import {
+  deduplicarAlocacoesAtivas,
+  parseAlocacoesAtivasJson,
+} from './utils/alocacoes-ativas'
 
 type ResponsavelTotvsDto =
   | ResponsavelCancelamentoTotvsDto
@@ -15,6 +19,11 @@ type ResponsavelConsolidado = ResponsavelTotvsDto & {
   CD_Filiais?: number[]
   CD_Filiais_Aluno?: number[]
   CD_Alocacoes?: Array<{ CD_Coligada: number; CD_Filial: number }>
+  CD_Alocacoes_Ativas?: Array<{
+    CD_Coligada: number
+    CD_Filial: number
+    TP_Matricula?: 'REGULAR' | 'EXTRA'
+  }>
   CD_Alocacoes_Responsavel?: Array<{ CD_Coligada: number; CD_Filial: number }>
   IN_Matricula_Extra_Ativa_Coligada5?: number
 }
@@ -235,7 +244,10 @@ export class ResponsavelSyncProcessor {
       `${responsaveis.length} linha(s) de responsável encontradas para concessão global`,
     )
 
-    const grupos = this.agruparResponsaveis(responsaveis, 'ConcessaoResponsavel')
+    const grupos = this.agruparResponsaveis(
+      responsaveis,
+      'ConcessaoResponsavel',
+    )
 
     const jobs = await Promise.all(
       [...grupos.values()].map((grupo) => {
@@ -342,7 +354,10 @@ export class ResponsavelSyncProcessor {
       return
     }
 
-    const grupos = this.agruparResponsaveis(responsaveis, 'ConcessaoResponsavel')
+    const grupos = this.agruparResponsaveis(
+      responsaveis,
+      'ConcessaoResponsavel',
+    )
     const consolidados = this.selecionarGruposUnitarios(grupos, data)
 
     if (consolidados.length === 0) {
@@ -360,6 +375,16 @@ export class ResponsavelSyncProcessor {
         continue
       }
 
+      if (
+        !consolidado.CD_Pessoa &&
+        consolidado.IN_Responsavel_Financeiro !== 1
+      ) {
+        this.logger.warn(
+          `[ConcessaoResponsavel] Responsável sem CD_Pessoa ignorado para evitar vínculo TOTVS inválido (cpf ${consolidado.CD_CPF}, coligada ${consolidado.CD_Coligada})`,
+        )
+        continue
+      }
+
       const ctx = this.mapToPessoaAcessoContext(consolidado, false)
       await this.accessProvisioningService.provisionarAcesso(ctx)
     }
@@ -371,7 +396,8 @@ export class ResponsavelSyncProcessor {
   ): PessoaAcessoContext {
     const inResponsavel = responsavel.IN_Filiacao
       ? 1
-      : responsavel.IN_Responsavel_Academico || responsavel.IN_Responsavel_Financeiro
+      : responsavel.IN_Responsavel_Academico ||
+          responsavel.IN_Responsavel_Financeiro
         ? 1
         : 0
 
@@ -402,6 +428,7 @@ export class ResponsavelSyncProcessor {
       CD_Filial: responsavel.CD_Filial ?? null,
       CD_Filiais: responsavel.CD_Filiais,
       CD_Alocacoes: responsavel.CD_Alocacoes,
+      CD_Alocacoes_Ativas: responsavel.CD_Alocacoes_Ativas,
       CD_Alocacoes_Responsavel: responsavel.CD_Alocacoes_Responsavel,
       CD_Coligada_Aluno: responsavel.CD_Coligada_Aluno ?? null,
       CD_Filiais_Aluno: responsavel.CD_Filiais_Aluno,
@@ -435,7 +462,9 @@ export class ResponsavelSyncProcessor {
 
   private selecionarGruposUnitarios(
     grupos: Map<string, ResponsavelTotvsDto[]>,
-    data: CancelamentoResponsavelUnitarioJobData | AtivacaoResponsavelUnitarioJobData,
+    data:
+      | CancelamentoResponsavelUnitarioJobData
+      | AtivacaoResponsavelUnitarioJobData,
   ): ResponsavelConsolidado[] {
     if (this.deveProcessarTodosGruposPorRa(data)) {
       return [...grupos.values()].map((grupo) => this.consolidarGrupo(grupo))
@@ -446,18 +475,20 @@ export class ResponsavelSyncProcessor {
   }
 
   private deveProcessarTodosGruposPorRa(
-    data: CancelamentoResponsavelUnitarioJobData | AtivacaoResponsavelUnitarioJobData,
+    data:
+      | CancelamentoResponsavelUnitarioJobData
+      | AtivacaoResponsavelUnitarioJobData,
   ): boolean {
     return (
-      !!data.CD_Registro_Academico &&
-      data.CD_Pessoa === null &&
-      !data.CD_CPF
+      !!data.CD_Registro_Academico && data.CD_Pessoa === null && !data.CD_CPF
     )
   }
 
   private selecionarGrupoUnitario(
     grupos: Map<string, ResponsavelTotvsDto[]>,
-    data: CancelamentoResponsavelUnitarioJobData | AtivacaoResponsavelUnitarioJobData,
+    data:
+      | CancelamentoResponsavelUnitarioJobData
+      | AtivacaoResponsavelUnitarioJobData,
   ): ResponsavelConsolidado | null {
     const chavePessoa =
       data.CD_Pessoa !== null && data.CD_Pessoa !== undefined
@@ -477,12 +508,15 @@ export class ResponsavelSyncProcessor {
     return this.consolidarGrupo(grupo)
   }
 
-  private consolidarGrupo(
-    grupo: ResponsavelTotvsDto[],
-  ): ResponsavelTotvsDto & {
+  private consolidarGrupo(grupo: ResponsavelTotvsDto[]): ResponsavelTotvsDto & {
     CD_Filiais: number[]
     CD_Filiais_Aluno: number[]
     CD_Alocacoes: Array<{ CD_Coligada: number; CD_Filial: number }>
+    CD_Alocacoes_Ativas: Array<{
+      CD_Coligada: number
+      CD_Filial: number
+      TP_Matricula?: 'REGULAR' | 'EXTRA'
+    }>
     CD_Alocacoes_Responsavel: Array<{ CD_Coligada: number; CD_Filial: number }>
     IN_Matricula_Extra_Ativa_Coligada5: number
   } {
@@ -507,13 +541,21 @@ export class ResponsavelSyncProcessor {
 
     const alocacoes = [...alocacaoMap.values()]
     const alocacoesAluno = [...alocacaoAlunoMap.values()]
+    const alocacoesAtivas = deduplicarAlocacoesAtivas(
+      grupo.flatMap((item) =>
+        parseAlocacoesAtivasJson(
+          item.JS_Alocacoes_Ativas,
+          this.logger,
+          `Responsavel ${item.CD_CPF ?? item.CD_Pessoa ?? 'N/A'}`,
+        ),
+      ),
+    )
     const primeiroComPessoa = grupo.find((item) => !!item.CD_Pessoa)
     const primeiroComUsuario = grupo.find((item) => !!item.CD_Usuario)
     const primeiroComCpf = grupo.find((item) => !!item.CD_CPF)
     const primeiroComColigadaAluno = grupo.find(
       (item) =>
-        item.CD_Coligada_Aluno !== null &&
-        item.CD_Coligada_Aluno !== undefined,
+        item.CD_Coligada_Aluno !== null && item.CD_Coligada_Aluno !== undefined,
     )
     const possuiMatriculaExtraAtivaColigada5 = grupo.some(
       (item) =>
@@ -559,6 +601,7 @@ export class ResponsavelSyncProcessor {
       CD_Filial: alocacoes.length > 0 ? alocacoes[0].CD_Filial : null,
       CD_Filiais: [...new Set(alocacoes.map((item) => item.CD_Filial))],
       CD_Alocacoes: alocacoesAluno,
+      CD_Alocacoes_Ativas: alocacoesAtivas,
       CD_Alocacoes_Responsavel: alocacoes,
       CD_Coligada_Aluno:
         primeiroComColigadaAluno?.CD_Coligada_Aluno ??
@@ -619,9 +662,7 @@ export class ResponsavelSyncProcessor {
     return null
   }
 
-  private getResponsavelKey(
-    responsavel: ResponsavelTotvsDto,
-  ): string | null {
+  private getResponsavelKey(responsavel: ResponsavelTotvsDto): string | null {
     if (responsavel.CD_CPF) {
       return `C:${responsavel.CD_CPF}`
     }
@@ -639,5 +680,4 @@ export class ResponsavelSyncProcessor {
     const parsed = Number(value)
     return Number.isNaN(parsed) ? null : parsed
   }
-
 }
