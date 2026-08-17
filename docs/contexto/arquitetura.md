@@ -1,11 +1,12 @@
 # Arquitetura
 
 ## Stack real (preencher só o que existe)
-- **Backend:** [Node.js, NestJS, TypeScript, ...]
-- **Frontend:** [Next.js, Tailwind, PrimeReact, shadcn/ui, ...]  *(só se houver)*
-- **Banco:** [SQL Server] · **Acesso a dados:** [Prisma | Query Builder | SQL nativo]
-- **Filas/Cache:** [Bull/BullMQ, Redis] · **Container/Plataforma:** [Docker, CapRover]
-- **Auth:** [...] · **Observabilidade:** [...]
+- **Backend:** Node.js, NestJS, TypeScript.
+- **Frontend:** não identificado neste repositório.
+- **Banco:** SQL Server · **Acesso a dados:** Prisma e SQL nativo via procedures TOTVS.
+- **Filas/Cache:** Bull, Redis · **Container/Plataforma:** Docker.
+- **Auth:** `x-api-key` em rotas protegidas, com exceções por decorator `@Public()`.
+- **Observabilidade:** `nestjs-pino`/Pino JSON em stdout, OpenTelemetry Node SDK via OTLP HTTP, Error Capture Service externo.
 
 ## Fronteiras e camadas
 [Como o sistema se divide: módulos de domínio, camadas (controller → service → repositório), o que é síncrono vs assíncrono, onde ficam as integrações externas.]

@@ -15,6 +15,22 @@
 -->
 
 ## 2026-08-17 — Codex
+- **Demanda:** Aplicar a observabilidade planejada na spec `2026-03-observabilidade-centralizada`.
+- **Feito:** Implementado OpenTelemetry, logger Pino JSON com trace ativo, sanitização central de logs, Error Capture fire-and-forget, filtro global sanitizado e `.env.example` sem segredos.
+- **Decisões:** Error Capture usa o contrato da spec e não bloqueia respostas; Collector indisponível não derruba bootstrap; jobs Bull não propagam trace da requisição nesta entrega.
+- **Arquivos tocados:** `apps/backend/src/tracing.ts`, `apps/backend/src/core/logger/logger.module.ts`, `apps/backend/src/core/observability/*`, `apps/backend/src/common/filters/all-exceptions.filter.ts`, logs em módulos de sync/TOTVS/Google, `apps/backend/.env.example`, `docs/specs/2026-03-observabilidade-centralizada.md`, `docs/contexto/*`.
+- **Validação:** `pnpm --dir apps/backend build`; varreduras `rg` para `console.log` e payloads em logs; smokes locais com OTel ligado/desligado e Collector/Error Capture indisponíveis.
+- **Próximo:** Validar em ambiente integrado a correlação `trace_id` em Loki, Tempo e Error Capture central.
+
+## 2026-08-17 — Codex
+- **Demanda:** Analisar e planejar spec com base em `Implementar-observabilidade (1).md`.
+- **Feito:** Criada spec `docs/specs/2026-03-observabilidade-centralizada.md` em Rascunho, com objetivo, escopo, contratos de logs/OTel/Error Capture, critérios de aceite, riscos e plano de execução.
+- **Decisões:** A spec ficou em Rascunho porque ainda dependem de confirmação o contrato real do Error Capture Service, a política de trace em jobs Bull e o nome oficial de `SERVICE_NAME`.
+- **Arquivos tocados:** `docs/specs/2026-03-observabilidade-centralizada.md`, `docs/specs/README.md`, `docs/contexto/estado-atual.md`, `docs/contexto/diario.md`.
+- **Validação:** Análise estática do backend; não houve implementação nem build nesta sessão.
+- **Próximo:** Revisar/aprovar a spec e então implementar observabilidade conforme o plano.
+
+## 2026-08-17 — Codex
 - **Demanda:** Implementar spec aprovada para alocações ativas regular/extra e mapear webhook vindo da coligada 6.
 - **Feito:** Criado contrato `JS_Alocacoes_Ativas`; backend parseia e usa alocações reais para `SUSUARIOFILIAL` e perfis; webhook preserva origem 6 e tenta resolver RA 5 por `CODPESSOA`; scripts SQL versionados retornam JSON e removem remapeamento 6→5 nas alocações.
 - **Decisões:** Coligada 6 provisiona acesso/perfil na coligada 6. RA 5 é apenas ponte de compatibilidade para procedures legadas quando webhook chega com RA da 6.
