@@ -282,7 +282,7 @@ export class AccessProvisioningService {
     if (ctx.TX_Email_Pessoa === ctx.TX_Email_Institucional) return
 
     this.logger.log(
-      `[EmailPessoa] Atualizando email da pessoa ${ctx.CD_Pessoa} para ${ctx.TX_Email_Institucional}`,
+      `[EmailPessoa] Atualizando email institucional da pessoa ${ctx.CD_Pessoa}`,
     )
 
     const result = await this.totvsService.atualizarEmailAluno(
@@ -311,7 +311,7 @@ export class AccessProvisioningService {
     )
 
     this.logger.log(
-      `[Revogação] Gmail ${ctx.TX_Email_Institucional} -> ${status}`,
+      `[Revogação] Gmail institucional -> ${status}`,
     )
   }
 
@@ -850,7 +850,7 @@ export class AccessProvisioningService {
       const usuarioCpf = await this.totvsService.verificarUsuario(ctx.CD_CPF)
       if (usuarioCpf) {
         this.logger.log(
-          `[Revogação] Usuário resolvido por CD_CPF ${ctx.CD_CPF} para ${ctx.CD_Identificador}`,
+          `[Revogação] Usuário resolvido por CD_CPF para ${ctx.CD_Identificador}`,
         )
         return {
           cdUsuario: ctx.CD_CPF,

@@ -279,7 +279,9 @@ export class AlunoSyncProcessor {
         aluno,
         coligada,
       )
-      this.logger.log(`[Google] ${email} → ${googleResult}`)
+      this.logger.log(
+        `[Google] Resultado do provisionamento na coligada ${coligada.id}: ${googleResult}`,
+      )
     }
 
     // 2. Montar contexto genérico e delegar ao serviço de provisionamento

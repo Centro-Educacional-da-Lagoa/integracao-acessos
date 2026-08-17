@@ -6,10 +6,12 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { SyncModule } from './modules/sync/sync.module';
 import { TotvsModule } from './modules/integrations/totvs/totvs.module';
 import { ApiKeyGuard } from './common/guards/api-key.guard';
+import { ObservabilityModule } from './core/observability/observability.module';
 	
 @Module({
   imports: [
     AppLoggerModule,
+    ObservabilityModule,
     PrismaModule,
     ScheduleModule.forRoot(),
     SyncModule,

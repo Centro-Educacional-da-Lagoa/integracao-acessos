@@ -45,7 +45,7 @@ export class ResponsavelSyncController {
     const payload = this.parseBody(body, AtivacaoResponsavelSchema)
 
     this.logger.log(
-      `Concessão unitária de responsável disparada (pessoa ${payload.CD_Pessoa ?? 'NULL'}, cpf ${payload.CD_CPF ?? 'NULL'}, ra ${payload.CD_Registro_Academico ?? 'NULL'})`,
+      `Concessão unitária de responsável disparada (pessoa ${payload.CD_Pessoa ?? 'NULL'}, cpf ${payload.CD_CPF ? 'informado' : 'NULL'}, ra ${payload.CD_Registro_Academico ?? 'NULL'})`,
     )
 
     this.responsavelSyncService.syncResponsavel(payload).catch((error) => {
@@ -83,7 +83,7 @@ export class ResponsavelSyncController {
     const payload = this.parseBody(body, CancelamentoResponsavelSchema)
 
     this.logger.log(
-      `Cancelamento unitário de responsável disparado (pessoa ${payload.CD_Pessoa ?? 'NULL'}, cpf ${payload.CD_CPF ?? 'NULL'})`,
+      `Cancelamento unitário de responsável disparado (pessoa ${payload.CD_Pessoa ?? 'NULL'}, cpf ${payload.CD_CPF ? 'informado' : 'NULL'})`,
     )
 
     this.responsavelSyncService.syncCancelamentoResponsavel(payload).catch(

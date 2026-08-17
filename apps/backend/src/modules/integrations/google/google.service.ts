@@ -17,9 +17,9 @@ export class GoogleService {
     return process.env.NODE_ENV === 'production'
   }
 
-  private logSkippedNonProduction(action: string, email: string): void {
+  private logSkippedNonProduction(action: string): void {
     this.logger.warn(
-      `[Google] ${action} ignorado para ${email}: NODE_ENV=${process.env.NODE_ENV ?? 'undefined'}`,
+      `[Google] ${action} ignorado: NODE_ENV=${process.env.NODE_ENV ?? 'undefined'}`,
     )
   }
 
@@ -45,11 +45,13 @@ export class GoogleService {
       }
     } catch (error: any) {
       if (error.code === 404) {
-        this.logger.log(`Conta Google não encontrada: ${data.TX_Email}`)
+        this.logger.log(
+          `Conta Google não encontrada na coligada ${data.CD_Coligada}`,
+        )
         return { exists: false, suspended: false }
       }
       this.logger.error(
-        `Erro ao verificar conta Google para ${data.TX_Email}`,
+        `Erro ao verificar conta Google na coligada ${data.CD_Coligada}`,
         error.stack,
       )
       throw error
@@ -90,10 +92,13 @@ export class GoogleService {
         },
       })
 
-      this.logger.log(`Conta Google criada: ${email}`)
+      this.logger.log(`Conta Google criada na coligada ${coligada}`)
     } catch (error: any) {
-      this.logger.error(`Erro ao criar conta Google para ${email}`, error.stack)
-      throw new HttpException(`Erro ao criar a conta Gmail para ${email}`, 500)
+      this.logger.error(
+        `Erro ao criar conta Google na coligada ${coligada}`,
+        error.stack,
+      )
+      throw new HttpException('Erro ao criar a conta Gmail', 500)
     }
   }
 
@@ -117,16 +122,18 @@ export class GoogleService {
         requestBody: { suspended: true },
       })
 
-      this.logger.log(`Conta Google suspensa: ${email}`)
+      this.logger.log(`Conta Google suspensa na coligada ${coligada}`)
       return { message: 'Email suspenso!' }
     } catch (error: any) {
       if (error.code === 404) {
-        this.logger.log(`Conta Google não encontrada para suspensão: ${email}`)
+        this.logger.log(
+          `Conta Google não encontrada para suspensão na coligada ${coligada}`,
+        )
         return { message: 'Email inexistente.' }
       }
 
       this.logger.error(
-        `Erro ao suspender conta Google para ${email}`,
+        `Erro ao suspender conta Google na coligada ${coligada}`,
         error.stack,
       )
       throw new HttpException('Erro ao suspender a conta Gmail', 500)
@@ -153,11 +160,11 @@ export class GoogleService {
         requestBody: { suspended: false },
       })
 
-      this.logger.log(`Conta Google reativada: ${email}`)
+      this.logger.log(`Conta Google reativada na coligada ${coligada}`)
       return { message: 'Email reativado!' }
     } catch (error: any) {
       this.logger.error(
-        `Erro ao reativar conta Google para ${email}`,
+        `Erro ao reativar conta Google na coligada ${coligada}`,
         error.stack,
       )
       throw new HttpException('Erro ao reativar a conta Gmail', 500)
@@ -180,7 +187,7 @@ export class GoogleService {
     'created' | 'activated' | 'already_active' | 'skipped_non_production'
   > {
     if (!this.isProduction()) {
-      this.logSkippedNonProduction('Provisionamento de Gmail de aluno', email)
+      this.logSkippedNonProduction('Provisionamento de Gmail de aluno')
       return 'skipped_non_production'
     }
 
@@ -199,7 +206,7 @@ export class GoogleService {
       return 'activated'
     }
 
-    this.logger.log(`Conta Google já ativa: ${email}`)
+    this.logger.log(`Conta Google já ativa na coligada ${coligada.id}`)
     return 'already_active'
   }
 
@@ -212,7 +219,6 @@ export class GoogleService {
     if (!this.isProduction()) {
       this.logSkippedNonProduction(
         'Cancelamento de Gmail institucional de aluno',
-        TX_Email,
       )
       return 'skipped_non_production'
     }
@@ -223,12 +229,16 @@ export class GoogleService {
     })
 
     if (!exists) {
-      this.logger.log(`Conta Google ausente para cancelamento: ${TX_Email}`)
+      this.logger.log(
+        `Conta Google ausente para cancelamento na coligada ${CD_Coligada}`,
+      )
       return 'not_found'
     }
 
     if (suspended) {
-      this.logger.log(`Conta Google já suspensa: ${TX_Email}`)
+      this.logger.log(
+        `Conta Google já suspensa na coligada ${CD_Coligada}`,
+      )
       return 'already_suspended'
     }
 

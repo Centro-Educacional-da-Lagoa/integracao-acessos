@@ -79,7 +79,6 @@ export class AlunoSyncController {
   async triggerWebhookAluno(
     @Body() body: unknown,
   ): Promise<{ message: string }> {
-    console.log('🚀 ~ AlunoSyncController ~ triggerWebhookAluno ~ body:', body)
     const payload = this.parseBody(body, WebhookAlunoSchema)
 
     this.logger.log(

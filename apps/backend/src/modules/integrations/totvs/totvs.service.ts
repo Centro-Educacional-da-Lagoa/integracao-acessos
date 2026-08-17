@@ -366,7 +366,7 @@ export class TotvsService {
     email: string,
   ): Promise<TotvsApiResponse> {
     this.logger.log(
-      `Atualizando email da pessoa ${cdPessoa} na coligada ${coligada} para ${email}`,
+      `Atualizando email da pessoa ${cdPessoa} na coligada ${coligada}`,
     )
 
     const parametros = {
@@ -412,10 +412,9 @@ export class TotvsService {
         this.logger.error(error)
       }
 
-      this.logger.error('PARÂMETROS USADOS:')
-      this.logger.error(JSON.stringify(parametros, null, 2))
-      this.logger.error('CD_PESSOA:')
-      this.logger.error(cdPessoa)
+      this.logger.error(
+        `Contexto TOTVS: operação=atualizarEmailAluno pessoa=${cdPessoa} coligada=${coligada}`,
+      )
       this.logger.error('------------------------------------')
 
       return {
@@ -767,8 +766,9 @@ export class TotvsService {
         this.logger.error(error)
       }
 
-      this.logger.error('PAYLOAD:')
-      this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error(
+        `[UsuarioFilial] Contexto sanitizado: usuario=${cdUsuario} coligada=${cdColigada} filial=${cdFilial}`,
+      )
       this.logger.error('------------------------------------')
 
       return {
@@ -922,8 +922,9 @@ export class TotvsService {
         this.logger.error(error)
       }
 
-      this.logger.error('PAYLOAD:')
-      this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error(
+        `Contexto TOTVS: operação=vincularUsuarioPessoa usuario=${cdUsuario} pessoa=${cdPessoa}`,
+      )
       this.logger.error('------------------------------------')
 
       return {
@@ -975,9 +976,7 @@ export class TotvsService {
       payload.EMAIL = email
     }
 
-    this.logger.debug(
-      `Payload de criação de usuário: ${JSON.stringify(payload)}`,
-    )
+    this.logger.debug('Payload de criação de usuário omitido por privacidade')
 
     try {
       const response = await axios({
@@ -1004,8 +1003,9 @@ export class TotvsService {
         this.logger.error(error)
       }
 
-      this.logger.error('PAYLOAD:')
-      this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error(
+        `Contexto TOTVS: operação=criarUsuario usuario=${cdUsuario}`,
+      )
       this.logger.error('------------------------------------')
 
       return {
@@ -1042,9 +1042,7 @@ export class TotvsService {
 
     if (deveAtualizarEmail) {
       payload.EMAIL = emailEsperado
-      this.logger.log(
-        `Reativando usuário ${cdUsuario} e atualizando email para ${emailEsperado}`,
-      )
+      this.logger.log(`Reativando usuário ${cdUsuario} e atualizando email`)
     } else {
       this.logger.log(`Reativando usuário ${cdUsuario} sem alteração de email`)
     }
@@ -1075,8 +1073,9 @@ export class TotvsService {
         this.logger.error(error)
       }
 
-      this.logger.error('PAYLOAD:')
-      this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error(
+        `Contexto TOTVS: operação=ativarUsuario usuario=${cdUsuario}`,
+      )
       this.logger.error('------------------------------------')
 
       return {
@@ -1255,8 +1254,9 @@ export class TotvsService {
         this.logger.error(error)
       }
 
-      this.logger.error('PAYLOAD:')
-      this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error(
+        `Contexto TOTVS: operação=atualizarPerfisUsuario usuario=${cdUsuario} sistema=${codSistema}`,
+      )
       this.logger.error('------------------------------------')
 
       return {
@@ -1348,9 +1348,7 @@ export class TotvsService {
     cdUsuario: string,
     emailEsperado: string,
   ): Promise<TotvsApiResponse> {
-    this.logger.log(
-      `Atualizando email do usuário ativo ${cdUsuario} para ${emailEsperado}`,
-    )
+    this.logger.log(`Atualizando email do usuário ativo ${cdUsuario}`)
 
     const payload = { EMAIL: emailEsperado }
 
@@ -1387,8 +1385,9 @@ export class TotvsService {
         this.logger.error(error)
       }
 
-      this.logger.error('PAYLOAD:')
-      this.logger.error(JSON.stringify(payload, null, 2))
+      this.logger.error(
+        `Contexto TOTVS: operação=atualizarEmailUsuario usuario=${cdUsuario}`,
+      )
       this.logger.error('------------------------------------')
 
       return {
