@@ -43,7 +43,7 @@ Referências de contexto: `docs/contexto/regras-negocio.md`, `docs/contexto/inte
 - Aplicar procedure diretamente em ambiente TOTVS nesta sessão.
 
 ## Contratos
-- **Endpoints / rotas:** não há novo endpoint obrigatório. Reprocessamento manual pode ser avaliado em implementação futura, seguindo o padrão atual de sync.
+- **Endpoints / rotas:** `POST /sync/alunos/cancelamentos-email-concluintes-em` dispara manualmente o fluxo complementar. Body opcional: `CD_Periodo_Letivo_Anterior` e `CD_Coligada`; sem body, usa `PERIODO_LETIVO - 1` e todas as coligadas elegíveis.
 - **Entrada (payload/DTO):**
   - `AlunoCancelamentoTotvsDto` deve incluir `IN_Cancela_Email: 0 | 1`.
   - Durante rollout, o backend deve tolerar ausência temporária do campo e assumir comportamento conservador definido na implementação. Recomendação: assumir `1` para compatibilidade com procedure antiga, mas logar ausência para acelerar correção de ambiente.
@@ -72,6 +72,7 @@ Referências de contexto: `docs/contexto/regras-negocio.md`, `docs/contexto/inte
 - [x] O backend mantém a revogação de usuário-filial/perfis conforme regras existentes mesmo quando o e-mail for preservado.
 - [x] Existe query/procedure separada para buscar somente concluintes EM elegíveis ao cancelamento de Gmail.
 - [x] Existe cron/job específico para enfileirar e processar cancelamento de Gmail de concluintes EM elegíveis.
+- [x] Existe rota manual para disparar o fluxo sem depender exclusivamente do cron.
 - [x] Jobs individuais têm chave/deduplicação por coligada, período letivo anterior e RA ou pessoa.
 - [x] Logs distinguem `email_cancel_skip_in_cancela_email`, `email_cancel_google_skipped_non_production`, `email_cancel_google_already_suspended` e falha de integração.
 - [x] `pnpm --dir apps/backend build` passa após a implementação.
@@ -105,10 +106,11 @@ Referências de contexto: `docs/contexto/regras-negocio.md`, `docs/contexto/inte
 4. [x] Backend revogação: ajustar `_cancelarEmailInstitucional` para bloquear chamada Google quando `IN_Cancela_Email = 0`, com log explícito.
 5. [x] Backend TOTVS: adicionar método no `TotvsService` para consultar concluintes EM elegíveis.
 6. [x] Jobs/cron: criar cron diário de madrugada para enfileirar lote por coligada e jobs individuais de cancelamento de Gmail de concluintes EM.
-7. [x] Validação: revisar SQL estaticamente e executar build backend.
+7. [x] API: criar rota manual para disparar o fluxo complementar sem depender exclusivamente do cron.
+8. [x] Validação: revisar SQL estaticamente e executar build backend.
 
 ## Query/procedure prevista
-Forma recomendada para a regra de carência, sujeita à confirmação da data oficial do período letivo:
+Regra aplicada para a carência:
 
 ```sql
 declare @dt_fim_periodo_anterior date =
@@ -137,8 +139,8 @@ where prlt.codperlet = @prm_cd_periodo_letivo_anterior
 ```
 
 ## Cron previsto
-- Nome sugerido: `handleCancelamentoEmailConcluintesEnsinoMedioCron`.
-- Agenda sugerida: diária de madrugada, após o cancelamento geral, por exemplo `0 30 2 * * *`.
+- Nome: `handleCancelamentoEmailConcluintesEnsinoMedioCron`.
+- Agenda: diária de madrugada, após o cancelamento geral, `0 30 2 * * *`.
 - Lote: buscar coligadas habilitadas, calcular período letivo anterior a partir do ano corrente ou configuração já usada no serviço, consultar concluintes EM elegíveis por coligada e enfileirar job individual.
 - Job individual: validar `IN_Cancela_Email = 1`, montar e-mail institucional, chamar `GoogleService.cancelarEmailInstitucional`, registrar status e permitir retry.
 - Idempotência: chave do job por `cancelamento-email-em:{periodoAnterior}:{coligada}:{RA ou CD_Pessoa}`.

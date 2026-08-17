@@ -7,6 +7,7 @@ import {
   AlunoJobData,
   CancelamentoColigadaJobData,
   CancelamentoAlunoJobData,
+  CancelamentoEmailConcluintesEmColigadaJobData,
   WebhookAlunoJobData,
 } from './aluno-sync.processor'
 import { AlunoTotvsDto } from '../integrations/totvs/dto/aluno-totvs.dto'
@@ -79,6 +80,17 @@ export class AlunoSyncService {
       data.CD_Periodo_Letivo,
       data.CD_Coligada,
       data.CD_Registro_Academico,
+    ].join(':')
+  }
+
+  private buildCancelamentoEmailConcluintesEmColigadaJobId(data: {
+    CD_Periodo_Letivo_Anterior: string
+    CD_Coligada: number
+  }): string {
+    return [
+      'cancelamento-email-em-coligada',
+      data.CD_Periodo_Letivo_Anterior,
+      data.CD_Coligada,
     ].join(':')
   }
 
@@ -279,6 +291,68 @@ export class AlunoSyncService {
     )
   }
 
+  async syncCancelamentoEmailConcluintesEnsinoMedio(data?: {
+    CD_Periodo_Letivo_Anterior?: string
+    CD_Coligada?: number
+    TP_Origem_Disparo?: 'BATCH' | 'REPROCESSAMENTO'
+  }): Promise<void> {
+    const CD_Periodo_Letivo_Anterior =
+      data?.CD_Periodo_Letivo_Anterior ??
+      this.resolvePeriodoLetivoAnteriorFromEnv()
+
+    const coligadas = data?.CD_Coligada
+      ? [getColigadaConfigById(data.CD_Coligada)]
+      : listColigadasConfig()
+
+    if (coligadas.length === 0) {
+      this.logger.error('Nenhuma coligada configurada na variável COLIGADAS.')
+      return
+    }
+
+    const coligadasElegiveis = coligadas.filter(
+      (coligada) => !this.isProcedureBlockedColigada(coligada.id),
+    )
+    if (coligadasElegiveis.length === 0) {
+      this.logger.error(
+        'Nenhuma coligada elegível para cancelamento de Gmail de concluintes EM.',
+      )
+      return
+    }
+
+    this.logger.log(
+      `Adicionando jobs de cancelamento de Gmail de concluintes EM — período anterior ${CD_Periodo_Letivo_Anterior}, ${coligadasElegiveis.length} coligada(s) elegível(is)`,
+    )
+
+    const jobPromises = coligadasElegiveis.map((coligada) =>
+      this.addAlunoSyncJob(
+        'cancelamento-email-concluintes-em-coligada',
+        {
+          CD_Periodo_Letivo_Anterior,
+          coligada,
+          TP_Origem_Disparo: data?.TP_Origem_Disparo ?? 'REPROCESSAMENTO',
+        } as CancelamentoEmailConcluintesEmColigadaJobData,
+        {
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 5000,
+          },
+          jobId: this.buildCancelamentoEmailConcluintesEmColigadaJobId({
+            CD_Periodo_Letivo_Anterior,
+            CD_Coligada: coligada.id,
+          }),
+          removeOnComplete: AlunoSyncService.REMOVE_ON_COMPLETE,
+        },
+      ),
+    )
+
+    const jobs = await Promise.all(jobPromises)
+
+    this.logger.log(
+      `${jobs.length} job(s) de cancelamento de Gmail de concluintes EM adicionados à fila para ${coligadasElegiveis.length} coligada(s)`,
+    )
+  }
+
   async syncCancelamentoAluno(data: {
     CD_Registro_Academico: string
     CD_Coligada: number
@@ -387,6 +461,24 @@ export class AlunoSyncService {
     }
 
     return coligadas[0]
+  }
+
+  private resolvePeriodoLetivoAnteriorFromEnv(): string {
+    const CD_Periodo_Letivo = process.env.PERIODO_LETIVO
+    if (!CD_Periodo_Letivo) {
+      throw new BadRequestException(
+        'CD_Periodo_Letivo_Anterior não informado e PERIODO_LETIVO não definido.',
+      )
+    }
+
+    const periodoAtual = Number.parseInt(CD_Periodo_Letivo, 10)
+    if (Number.isNaN(periodoAtual)) {
+      throw new BadRequestException(
+        `PERIODO_LETIVO inválido para calcular período anterior: ${CD_Periodo_Letivo}`,
+      )
+    }
+
+    return String(periodoAtual - 1)
   }
 
   private isProcedureBlockedColigada(CD_Coligada: number): boolean {

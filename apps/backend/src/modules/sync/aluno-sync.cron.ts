@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule'
 import { InjectQueue } from '@nestjs/bull'
 import { Queue } from 'bull'
 import { listColigadasConfig } from './utils/coligadas-config'
+import { AlunoSyncService } from './aluno-sync.service'
 
 @Injectable()
 export class AlunoSyncCron {
@@ -10,6 +11,7 @@ export class AlunoSyncCron {
 
   constructor(
     @InjectQueue('aluno-sync') private readonly alunoSyncQueue: Queue,
+    private readonly alunoSyncService: AlunoSyncService,
   ) {}
 
   // @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
@@ -114,7 +116,7 @@ export class AlunoSyncCron {
     }
   }
 
-  // @Cron('0 30 2 * * *')
+  @Cron('0 30 2 * * *')
   async handleCancelamentoEmailConcluintesEnsinoMedioCron(): Promise<void> {
     const traceId = crypto.randomUUID()
 
@@ -123,52 +125,12 @@ export class AlunoSyncCron {
     )
 
     try {
-      const CD_Periodo_Letivo = process.env.PERIODO_LETIVO
-      if (!CD_Periodo_Letivo) {
-        this.logger.error('Variável de ambiente PERIODO_LETIVO não definida.')
-        return
-      }
-
-      const periodoAtual = Number.parseInt(CD_Periodo_Letivo, 10)
-      if (Number.isNaN(periodoAtual)) {
-        this.logger.error(
-          `PERIODO_LETIVO inválido para calcular período anterior: ${CD_Periodo_Letivo}`,
-        )
-        return
-      }
-
-      const CD_Periodo_Letivo_Anterior = String(periodoAtual - 1)
-      const coligadas = listColigadasConfig()
-      if (coligadas.length === 0) {
-        this.logger.error('Nenhuma coligada configurada na variável COLIGADAS.')
-        return
-      }
-
-      const jobPromises = coligadas.map((coligada) =>
-        this.alunoSyncQueue.add(
-          'cancelamento-email-concluintes-em-coligada',
-          {
-            CD_Periodo_Letivo_Anterior,
-            coligada,
-            TP_Origem_Disparo: 'BATCH',
-          },
-          {
-            attempts: 3,
-            backoff: {
-              type: 'exponential',
-              delay: 5000,
-            },
-            jobId: `cancelamento-email-em-coligada:${CD_Periodo_Letivo_Anterior}:${coligada.id}`,
-            removeOnComplete: 1000,
-            removeOnFail: 1000,
-          },
-        ),
-      )
-
-      const jobs = await Promise.all(jobPromises)
+      await this.alunoSyncService.syncCancelamentoEmailConcluintesEnsinoMedio({
+        TP_Origem_Disparo: 'BATCH',
+      })
 
       this.logger.log(
-        `[traceId=${traceId}] ${jobs.length} job(s) de cancelamento de Gmail de concluintes EM adicionados à fila para ${coligadas.length} coligada(s)`,
+        `[traceId=${traceId}] Jobs de cancelamento de Gmail de concluintes EM adicionados à fila`,
       )
     } catch (error) {
       this.logger.error(

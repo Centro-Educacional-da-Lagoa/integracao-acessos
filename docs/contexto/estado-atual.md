@@ -23,7 +23,7 @@ Implementada regra de cancelamento de Gmail institucional de concluintes do Ensi
 
 ## Próximos passos (ordem sugerida)
 1. Aplicar e validar em SQL Server/TOTVS as procedures de cancelamento de aluno e concluintes EM.
-2. Habilitar o cron `handleCancelamentoEmailConcluintesEnsinoMedioCron` quando o ambiente operacional autorizar.
+2. Validar o cron `handleCancelamentoEmailConcluintesEnsinoMedioCron` em ambiente integrado.
 3. Publicar backend em ambiente com acesso ao Collector/Error Capture central.
 4. Disparar requisição válida e erro HTTP para validar correlação por `trace_id` em Loki, Tempo e Error Capture.
 5. Configurar variáveis de observabilidade conforme `apps/backend/.env.example`.
@@ -43,6 +43,6 @@ Implementada regra de cancelamento de Gmail institucional de concluintes do Ensi
 - Propagação de contexto OTel para jobs Bull ainda não foi implementada; jobs mantêm logs estruturados, mas não herdam automaticamente o trace da requisição que enfileirou o trabalho.
 
 ## Notas de handoff
-Entregue spec `2026-04-cancelamento-email-concluintes-em`: `IN_Cancela_Email` na procedure de cancelamento de aluno, procedure específica para concluintes EM elegíveis, guarda no cancelamento de Gmail e cron complementar. Build do backend passou; SQL ainda precisa aplicação/validação no TOTVS.
+Entregue spec `2026-04-cancelamento-email-concluintes-em`: `IN_Cancela_Email` na procedure de cancelamento de aluno, procedure específica para concluintes EM elegíveis, guarda no cancelamento de Gmail, cron complementar habilitado para 02:30 e rota manual `POST /sync/alunos/cancelamentos-email-concluintes-em`. Build do backend passou; SQL ainda precisa aplicação/validação no TOTVS.
 
 Implementada observabilidade centralizada: OpenTelemetry em `apps/backend/src/tracing.ts`, logger Pino JSON com `traceId`/`spanId`, sanitização central de logs, `ErrorCaptureService`, filtro global sanitizado e `.env.example`. Build passou e smokes locais confirmaram bootstrap com OTel ligado/desligado, Collector/Error Capture indisponíveis sem crash e logs HTTP com trace ativo.

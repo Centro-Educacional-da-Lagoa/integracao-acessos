@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common'
 import { AlunoSyncService } from './aluno-sync.service'
 import { CancelamentoAlunoSchema } from './dto/aluno-cancelamento.dto'
+import { CancelamentoEmailConcluinteEmSchema } from './dto/aluno-cancelamento-email-concluinte-em.dto'
 import { WebhookAlunoSchema } from './dto/aluno-webhook.dto'
 import { ZodError } from 'zod'
 import { Public } from '../../common/decorators/public.decorator'
@@ -71,6 +72,34 @@ export class AlunoSyncController {
     })
 
     return { message: 'Cancelamento unitário de acesso iniciado.' }
+  }
+
+  @Post('sync/alunos/cancelamentos-email-concluintes-em')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async triggerCancelamentoEmailConcluintesEnsinoMedio(
+    @Body() body: unknown,
+  ): Promise<{ message: string }> {
+    const payload = this.parseBody(
+      body ?? {},
+      CancelamentoEmailConcluinteEmSchema,
+    )
+
+    this.logger.log(
+      `Cancelamento de Gmail de concluintes EM disparado manualmente via API (período anterior ${payload.CD_Periodo_Letivo_Anterior ?? 'env'}, coligada ${payload.CD_Coligada ?? 'todas'})`,
+    )
+
+    this.alunoSyncService
+      .syncCancelamentoEmailConcluintesEnsinoMedio(payload)
+      .catch((error) => {
+        this.logger.error(
+          'Falha crítica no cancelamento de Gmail de concluintes EM',
+          error,
+        )
+      })
+
+    return {
+      message: 'Cancelamento de Gmail de concluintes EM iniciado.',
+    }
   }
 
   @Post('webhooks/alunos')
