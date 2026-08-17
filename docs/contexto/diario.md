@@ -15,6 +15,14 @@
 -->
 
 ## 2026-08-17 — Codex
+- **Demanda:** Planejar ajuste para `IN_Cancela_Email`, carência de concluintes do Ensino Médio e cron específico de cancelamento de Gmail.
+- **Feito:** Criada, aprovada e entregue a spec `docs/specs/2026-04-cancelamento-email-concluintes-em.md`; implementado `IN_Cancela_Email` na procedure de cancelamento de aluno, procedure específica de concluintes EM, guarda no backend e cron/job complementar para Gmail.
+- **Decisões:** A regra fica na procedure de aluno; demais casos do fluxo normal retornam `IN_Cancela_Email=1`; conclusão EM usa base `31/12/<ano>` e libera em `30/06`; o cron específico cancela somente Gmail.
+- **Arquivos tocados:** `apps/backend/src/modules/sync/**`, `apps/backend/src/modules/integrations/totvs/**`, `apps/docs/*Aluno*Cancelamento*Email*`, `docs/specs/2026-04-cancelamento-email-concluintes-em.md`, `docs/contexto/*`.
+- **Validação:** `pnpm --dir apps/backend build` passou. SQL revisado estaticamente; aplicação/validação em SQL Server/TOTVS fica pendente.
+- **Próximo:** Aplicar as procedures em homologação TOTVS e habilitar o cron quando autorizado.
+
+## 2026-08-17 — Codex
 - **Demanda:** Aplicar a observabilidade planejada na spec `2026-03-observabilidade-centralizada`.
 - **Feito:** Implementado OpenTelemetry, logger Pino JSON com trace ativo, sanitização central de logs, Error Capture fire-and-forget, filtro global sanitizado e `.env.example` sem segredos.
 - **Decisões:** Error Capture usa o contrato da spec e não bloqueia respostas; Collector indisponível não derruba bootstrap; jobs Bull não propagam trace da requisição nesta entrega.

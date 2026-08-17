@@ -197,6 +197,56 @@ export class TotvsService {
     )
   }
 
+  async fetchAlunosConclusaoEnsinoMedioCancelamentoEmail(
+    CD_Periodo_Letivo_Anterior: string,
+    CD_Coligada: number,
+    CD_Registro_Academico: string | null = null,
+  ): Promise<AlunoCancelamentoTotvsDto[]> {
+    const coligadaProcedure = this.normalizeProcedureColigada(CD_Coligada)
+
+    const periodoLetivoEscapado = CD_Periodo_Letivo_Anterior.replace(
+      /'/g,
+      "''",
+    )
+    const registroAcademicoSql = this.toSqlStringOrNull(CD_Registro_Academico)
+
+    this.logger.log(
+      `Buscando concluintes EM para cancelamento de email — coligada solicitada ${CD_Coligada}, coligada procedure ${coligadaProcedure}, período anterior ${CD_Periodo_Letivo_Anterior}`,
+    )
+
+    const result = await this.prisma.$queryRawUnsafe<
+      AlunoCancelamentoTotvsDto[]
+    >(
+      `
+      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Aluno_Conclusao_EM_Cancelamento_Email] '${periodoLetivoEscapado}', ${coligadaProcedure}, ${registroAcademicoSql}`,
+    )
+
+    this.logger.log(
+      `Encontrados ${result.length} concluinte(s) EM para cancelamento de email na coligada solicitada ${CD_Coligada} via procedure ${coligadaProcedure}`,
+    )
+
+    return result
+  }
+
+  async fetchAlunoConclusaoEnsinoMedioCancelamentoEmail(
+    CD_Periodo_Letivo_Anterior: string,
+    CD_Coligada: number,
+    CD_Registro_Academico: string,
+  ): Promise<AlunoCancelamentoTotvsDto | null> {
+    const alunos =
+      await this.fetchAlunosConclusaoEnsinoMedioCancelamentoEmail(
+        CD_Periodo_Letivo_Anterior,
+        CD_Coligada,
+        CD_Registro_Academico,
+      )
+
+    return (
+      alunos.find(
+        (aluno) => aluno.CD_Registro_Academico === CD_Registro_Academico,
+      ) ?? null
+    )
+  }
+
   async fetchIdentidadeAlunoPorRa(
     CD_Periodo_Letivo: string,
     CD_Coligada_Origem: number,

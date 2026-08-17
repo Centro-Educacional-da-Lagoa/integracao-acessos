@@ -19,8 +19,10 @@ BEGIN
 --declare @prm_cd_coligada			smallint     = 1
 
 declare	@vr_cd_periodo_letivo_anterior	varchar(20)
+		, @vr_dt_libera_cancelamento_email date
 
 select	@vr_cd_periodo_letivo_anterior = cast(cast(@prm_cd_periodo_letivo as int) - 1 as varchar(20))
+		, @vr_dt_libera_cancelamento_email = dateadd(month, 6, datefromparts(cast(cast(@prm_cd_periodo_letivo as int) - 1 as int), 12, 31))
 
 
 -- Alunos no período letivo com somente matrículas canceladas ou falecido.
@@ -43,6 +45,7 @@ select	 mtpl.codcoligada						as CD_Coligada
 		, 1										as IN_Inativo_Regular
 		, 0										as IN_Existe_Matricula_Extra
 		, 0										as IN_Inativo_Extra
+		, 1										as IN_Cancela_Email
 into	#tmp_aluno_cancelado
 from	dbo.smatricpl							as mtpl	with (nolock)
 inner	join dbo.spletivo						as prlt	with (nolock)
@@ -105,6 +108,7 @@ insert	into #tmp_aluno_cancelado
 		, IN_Inativo_Regular
 		, IN_Existe_Matricula_Extra
 		, IN_Inativo_Extra
+		, IN_Cancela_Email
 		)
 select	 mtpl.codcoligada						as CD_Coligada
 		, mtpl.codfilial						as CD_Filial
@@ -124,6 +128,11 @@ select	 mtpl.codcoligada						as CD_Coligada
 		, 1										as IN_Inativo_Regular
 		, 0										as IN_Existe_Matricula_Extra
 		, 0										as IN_Inativo_Extra
+		, case
+				when cast(getdate() as date) >= @vr_dt_libera_cancelamento_email
+				then 1
+				else 0
+		  end									as IN_Cancela_Email
 from	dbo.smatricpl							as mtpl	with (nolock)
 inner	join dbo.spletivo						as prlt	with (nolock)
   on	mtpl.codcoligada = prlt.codcoligada
@@ -181,6 +190,7 @@ insert into #tmp_aluno_cancelado
 		, IN_Inativo_Regular
 		, IN_Existe_Matricula_Extra
 		, IN_Inativo_Extra
+		, IN_Cancela_Email
 		)
 select	mtpl.codcoligada
 		, mtpl.codfilial
@@ -200,6 +210,7 @@ select	mtpl.codcoligada
 		, 0 as IN_Inativo_Regular
 		, 0 as IN_Existe_Matricula_Extra
 		, 0 as IN_Inativo_Extra
+		, 1 as IN_Cancela_Email
 from	smatricpl				as mtpl (nolock)
 inner	join spletivo			as prlt (nolock)
   on	mtpl.codcoligada = prlt.codcoligada
@@ -314,6 +325,7 @@ insert into #tmp_aluno_cancelado
 		, IN_Inativo_Regular
 		, IN_Existe_Matricula_Extra
 		, IN_Inativo_Extra
+		, IN_Cancela_Email
 		)
 select	mtpl.codcoligada
 		, mtpl.codfilial
@@ -333,6 +345,7 @@ select	mtpl.codcoligada
 		, 0 as IN_Inativo_Regular
 		, 1 as IN_Existe_Matricula_Extra
 		, 1 as IN_Inativo_Extra
+		, 1 as IN_Cancela_Email
 from	smatricpl				as mtpl (nolock)
 inner	join spletivo			as prlt (nolock)
   on	mtpl.codcoligada = prlt.codcoligada

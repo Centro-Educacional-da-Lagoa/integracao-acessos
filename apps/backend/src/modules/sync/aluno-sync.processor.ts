@@ -35,6 +35,20 @@ export interface CancelamentoAlunoJobData {
   aluno?: AlunoCancelamentoTotvsDto
 }
 
+export interface CancelamentoEmailConcluintesEmColigadaJobData {
+  CD_Periodo_Letivo_Anterior: string
+  coligada: ColigadaConfig
+  TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO'
+}
+
+export interface CancelamentoEmailConcluinteEmAlunoJobData {
+  CD_Periodo_Letivo_Anterior: string
+  CD_Registro_Academico: string
+  coligada: ColigadaConfig
+  TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO'
+  aluno?: AlunoCancelamentoTotvsDto
+}
+
 export interface WebhookAlunoJobData {
   CD_Periodo_Letivo: string
   CD_Registro_Academico: string
@@ -134,6 +148,57 @@ export class AlunoSyncProcessor {
 
     this.logger.debug(
       `[Job ${job.id}] Cancelamento do aluno ${CD_Registro_Academico} processado`,
+    )
+  }
+
+  @Process('cancelamento-email-concluintes-em-coligada')
+  async handleCancelamentoEmailConcluintesEmColigada(
+    job: Job<CancelamentoEmailConcluintesEmColigadaJobData>,
+  ): Promise<void> {
+    const { CD_Periodo_Letivo_Anterior, coligada, TP_Origem_Disparo } =
+      job.data
+
+    this.logger.log(
+      `[Job ${job.id}] [Coligada ${coligada.id}] Iniciando cancelamento de Gmail de concluintes EM (${TP_Origem_Disparo}, período anterior ${CD_Periodo_Letivo_Anterior})`,
+    )
+
+    await this.syncCancelamentoEmailConcluintesEmColigada(
+      CD_Periodo_Letivo_Anterior,
+      coligada,
+      TP_Origem_Disparo,
+    )
+
+    this.logger.log(
+      `[Job ${job.id}] [Coligada ${coligada.id}] Cancelamento de Gmail de concluintes EM concluído`,
+    )
+  }
+
+  @Process('cancelamento-email-concluinte-em-aluno')
+  async handleCancelamentoEmailConcluinteEmAluno(
+    job: Job<CancelamentoEmailConcluinteEmAlunoJobData>,
+  ): Promise<void> {
+    const {
+      aluno,
+      coligada,
+      CD_Periodo_Letivo_Anterior,
+      CD_Registro_Academico,
+      TP_Origem_Disparo,
+    } = job.data
+
+    this.logger.debug(
+      `[Job ${job.id}] Cancelando Gmail do concluinte EM ${CD_Registro_Academico} (${TP_Origem_Disparo})`,
+    )
+
+    await this.syncCancelamentoEmailConcluinteEmAluno({
+      aluno,
+      coligada,
+      CD_Periodo_Letivo_Anterior,
+      CD_Registro_Academico,
+      TP_Origem_Disparo,
+    })
+
+    this.logger.debug(
+      `[Job ${job.id}] Cancelamento de Gmail do concluinte EM ${CD_Registro_Academico} processado`,
     )
   }
 
@@ -407,6 +472,7 @@ export class AlunoSyncProcessor {
       IN_Inativo_Regular: alunoCancelamento.IN_Inativo_Regular,
       IN_Existe_Matricula_Extra: alunoCancelamento.IN_Existe_Matricula_Extra,
       IN_Inativo_Extra: alunoCancelamento.IN_Inativo_Extra,
+      IN_Cancela_Email: alunoCancelamento.IN_Cancela_Email ?? 1,
       CD_Alocacoes_Ativas: parseAlocacoesAtivasJson(
         alunoCancelamento.JS_Alocacoes_Ativas,
         this.logger,
@@ -419,5 +485,92 @@ export class AlunoSyncProcessor {
     }
 
     await this.accessProvisioningService.revogarAcesso(ctx)
+  }
+
+  private async syncCancelamentoEmailConcluintesEmColigada(
+    CD_Periodo_Letivo_Anterior: string,
+    coligada: ColigadaConfig,
+    TP_Origem_Disparo: 'BATCH' | 'REPROCESSAMENTO',
+  ): Promise<void> {
+    this.logger.log(
+      `[Coligada ${coligada.id}] Buscando concluintes EM para cancelamento de Gmail...`,
+    )
+
+    const alunos =
+      await this.totvsService.fetchAlunosConclusaoEnsinoMedioCancelamentoEmail(
+        CD_Periodo_Letivo_Anterior,
+        coligada.id,
+        null,
+      )
+
+    this.logger.log(
+      `[Coligada ${coligada.id}] ${alunos.length} concluinte(s) EM encontrado(s) para cancelamento de Gmail`,
+    )
+
+    const jobPromises = alunos.map((aluno) =>
+      this.alunoSyncQueue.add(
+        'cancelamento-email-concluinte-em-aluno',
+        {
+          aluno,
+          coligada,
+          CD_Periodo_Letivo_Anterior,
+          CD_Registro_Academico: aluno.CD_Registro_Academico,
+          TP_Origem_Disparo,
+        } as CancelamentoEmailConcluinteEmAlunoJobData,
+        {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 2000 },
+          jobId: `cancelamento-email-em:${CD_Periodo_Letivo_Anterior}:${coligada.id}:${aluno.CD_Registro_Academico}`,
+          removeOnComplete: 1000,
+          removeOnFail: 1000,
+        },
+      ),
+    )
+
+    const jobs = await Promise.all(jobPromises)
+
+    this.logger.log(
+      `[Coligada ${coligada.id}] ${jobs.length} job(s) de cancelamento de Gmail de concluintes EM adicionados à fila`,
+    )
+  }
+
+  private async syncCancelamentoEmailConcluinteEmAluno({
+    aluno,
+    coligada,
+    CD_Periodo_Letivo_Anterior,
+    CD_Registro_Academico,
+  }: CancelamentoEmailConcluinteEmAlunoJobData): Promise<void> {
+    const concluinte =
+      aluno ??
+      (await this.totvsService.fetchAlunoConclusaoEnsinoMedioCancelamentoEmail(
+        CD_Periodo_Letivo_Anterior,
+        coligada.id,
+        CD_Registro_Academico,
+      ))
+
+    if (!concluinte) {
+      this.logger.warn(
+        `[CancelamentoEmailEM] Aluno ${CD_Registro_Academico} não encontrado para cancelamento de Gmail na coligada ${coligada.id}`,
+      )
+      return
+    }
+
+    if ((concluinte.IN_Cancela_Email ?? 1) !== 1) {
+      this.logger.log(
+        `[CancelamentoEmailEM] Gmail institucional preservado para ${concluinte.CD_Registro_Academico} por IN_Cancela_Email=0 (email_cancel_skip_in_cancela_email)`,
+      )
+      return
+    }
+
+    const email = `${concluinte.CD_Registro_Academico}@${coligada.domain}`
+    const status = await this.googleService.cancelarEmailInstitucional(
+      email,
+      coligada.id,
+    )
+    const event = `email_cancel_google_${status}`
+
+    this.logger.log(
+      `[CancelamentoEmailEM] Gmail institucional de ${concluinte.CD_Registro_Academico} -> ${status} (${event})`,
+    )
   }
 }

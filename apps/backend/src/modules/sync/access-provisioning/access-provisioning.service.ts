@@ -301,6 +301,13 @@ export class AccessProvisioningService {
   private async _cancelarEmailInstitucional(
     ctx: PessoaAcessoContext,
   ): Promise<void> {
+    if (ctx.IN_Cancela_Email === 0) {
+      this.logger.log(
+        `[Revogação] Gmail institucional preservado para ${ctx.CD_Identificador} por IN_Cancela_Email=0 (email_cancel_skip_in_cancela_email)`,
+      )
+      return
+    }
+
     if (!this._deveCancelarEmailInstitucional(ctx)) {
       return
     }
@@ -309,9 +316,10 @@ export class AccessProvisioningService {
       ctx.TX_Email_Institucional,
       ctx.CD_Coligada,
     )
+    const event = `email_cancel_google_${status}`
 
     this.logger.log(
-      `[Revogação] Gmail institucional -> ${status}`,
+      `[Revogação] Gmail institucional -> ${status} (${event})`,
     )
   }
 

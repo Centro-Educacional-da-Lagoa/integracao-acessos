@@ -41,6 +41,7 @@ Ex.: `2026-01-importacao-nf.md`, `2026-02-webhook-pagamentos.md`.
 
 | Spec | Status | Demanda |
 |---|---|---|
+| `2026-04-cancelamento-email-concluintes-em.md` | Entregue | Cancelamento de e-mail para concluintes do Ensino Médio com carência de 6 meses |
 | `2026-03-observabilidade-centralizada.md` | Entregue | Observabilidade centralizada com logs JSON, OpenTelemetry e Error Capture |
 | `2026-01-guardas-provisionamento-totvs.md` | Entregue | Guardas contra provisionamento TOTVS com dados mestre ausentes |
 | `2026-02-alocacoes-ativas-regular-extra.md` | Entregue | Alocações ativas reais para regular/extra e webhook coligada 6 |

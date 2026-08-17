@@ -72,6 +72,9 @@ export interface PessoaAcessoContext {
   /** 1 = inativação extra acadêmica */
   IN_Inativo_Extra: number
 
+  /** 1 = permite cancelar Gmail institucional; 0 = preserva e-mail */
+  IN_Cancela_Email?: number
+
   /** 1 = possui matrícula extra ativa em linha de responsável da coligada 5 */
   IN_Matricula_Extra_Ativa_Coligada5?: number
 

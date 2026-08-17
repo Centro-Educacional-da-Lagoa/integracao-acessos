@@ -20,6 +20,7 @@ export const AlunoCancelamentoTotvsSchema = z.object({
   JS_Alocacoes_Ativas: z.string().nullable().optional(),
   IN_Funcionario: z.number().int().min(0).max(1),
   IN_Responsavel: z.number().int().min(0).max(1),
+  IN_Cancela_Email: z.number().int().min(0).max(1).optional().default(1),
 })
 
 export type AlunoCancelamentoTotvsDto = z.infer<
