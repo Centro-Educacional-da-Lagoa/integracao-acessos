@@ -10,6 +10,7 @@ import { AlunoTotvsDto } from '../integrations/totvs/dto/aluno-totvs.dto'
 import { AlunoCancelamentoTotvsDto } from '../integrations/totvs/dto/aluno-cancelamento-totvs.dto'
 import { ResponsavelSyncService } from './responsavel-sync.service'
 import { parseAlocacoesAtivasJson } from './utils/alocacoes-ativas'
+import { ALUNO_SYNC_CONCURRENCY } from './utils/queue-concurrency'
 
 export interface ColigadaSyncJobData {
   periodoLetivo: string
@@ -70,9 +71,41 @@ export class AlunoSyncProcessor {
   ) {}
 
   /**
+   * Processador único da fila `aluno-sync`.
+   *
+   * No Bull, cada `@Process('nome')` da mesma fila soma a sua concorrência
+   * (padrão 1): com 7 handlers nomeados, até 7 jobs rodavam ao mesmo
+   * tempo por instância. Agora há um só processador e a concorrência total
+   * da fila é ALUNO_SYNC_CONCURRENCY (variável de ambiente, padrão 1).
+   * Ver utils/queue-concurrency.ts.
+   */
+  @Process({ name: '*', concurrency: ALUNO_SYNC_CONCURRENCY })
+  async dispatch(job: Job<unknown>): Promise<void> {
+    switch (job.name) {
+      case 'sync-coligada':
+        return this.handleSyncColigada(job as Job<never>)
+      case 'sync-aluno':
+        return this.handleSyncAluno(job as Job<never>)
+      case 'cancelamentos-coligada':
+        return this.handleCancelamentosColigada(job as Job<never>)
+      case 'cancelamento-aluno':
+        return this.handleCancelamentoAluno(job as Job<never>)
+      case 'cancelamento-email-concluintes-em-coligada':
+        return this.handleCancelamentoEmailConcluintesEmColigada(
+          job as Job<never>,
+        )
+      case 'cancelamento-email-concluinte-em-aluno':
+        return this.handleCancelamentoEmailConcluinteEmAluno(job as Job<never>)
+      case 'webhook-aluno':
+        return this.handleWebhookAluno(job as Job<never>)
+      default:
+        throw new Error(`Job desconhecido na fila aluno-sync: ${job.name}`)
+    }
+  }
+
+  /**
    * Job por coligada: busca alunos ativos e adiciona cada um como job na fila
    */
-  @Process('sync-coligada')
   async handleSyncColigada(job: Job<ColigadaSyncJobData>): Promise<void> {
     const { periodoLetivo, coligada } = job.data
 
@@ -86,7 +119,6 @@ export class AlunoSyncProcessor {
   /**
    * Job por aluno: sincroniza um único aluno
    */
-  @Process('sync-aluno')
   async handleSyncAluno(job: Job<AlunoJobData>): Promise<void> {
     const { aluno, coligada } = job.data
 
@@ -101,7 +133,6 @@ export class AlunoSyncProcessor {
     )
   }
 
-  @Process('cancelamentos-coligada')
   async handleCancelamentosColigada(
     job: Job<CancelamentoColigadaJobData>,
   ): Promise<void> {
@@ -122,7 +153,6 @@ export class AlunoSyncProcessor {
     )
   }
 
-  @Process('cancelamento-aluno')
   async handleCancelamentoAluno(
     job: Job<CancelamentoAlunoJobData>,
   ): Promise<void> {
@@ -151,7 +181,6 @@ export class AlunoSyncProcessor {
     )
   }
 
-  @Process('cancelamento-email-concluintes-em-coligada')
   async handleCancelamentoEmailConcluintesEmColigada(
     job: Job<CancelamentoEmailConcluintesEmColigadaJobData>,
   ): Promise<void> {
@@ -173,7 +202,6 @@ export class AlunoSyncProcessor {
     )
   }
 
-  @Process('cancelamento-email-concluinte-em-aluno')
   async handleCancelamentoEmailConcluinteEmAluno(
     job: Job<CancelamentoEmailConcluinteEmAlunoJobData>,
   ): Promise<void> {
@@ -202,7 +230,6 @@ export class AlunoSyncProcessor {
     )
   }
 
-  @Process('webhook-aluno')
   async handleWebhookAluno(job: Job<WebhookAlunoJobData>): Promise<void> {
     const {
       CD_Periodo_Letivo,

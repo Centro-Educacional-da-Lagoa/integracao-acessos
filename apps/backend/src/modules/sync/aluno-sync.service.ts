@@ -15,6 +15,7 @@ import {
   getColigadaConfigById,
   listColigadasConfig,
 } from './utils/coligadas-config'
+import { buildSyncColigadaJobOptions } from './utils/queue-concurrency'
 
 @Injectable()
 export class AlunoSyncService {
@@ -130,13 +131,7 @@ export class AlunoSyncService {
           periodoLetivo,
           coligada,
         } as ColigadaSyncJobData,
-        {
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 5000,
-          },
-        },
+        buildSyncColigadaJobOptions(periodoLetivo, coligada.id),
       ),
     )
 
@@ -166,13 +161,7 @@ export class AlunoSyncService {
         periodoLetivo,
         coligada,
       } as ColigadaSyncJobData,
-      {
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-      },
+      buildSyncColigadaJobOptions(periodoLetivo, coligada.id),
     )
 
     this.logger.log(

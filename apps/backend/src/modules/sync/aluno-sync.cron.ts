@@ -4,6 +4,7 @@ import { InjectQueue } from '@nestjs/bull'
 import { Queue } from 'bull'
 import { listColigadasConfig } from './utils/coligadas-config'
 import { AlunoSyncService } from './aluno-sync.service'
+import { buildSyncColigadaJobOptions } from './utils/queue-concurrency'
 
 @Injectable()
 export class AlunoSyncCron {
@@ -41,13 +42,7 @@ export class AlunoSyncCron {
             periodoLetivo,
             coligada,
           },
-          {
-            attempts: 3, // Tenta até 3 vezes em caso de falha
-            backoff: {
-              type: 'exponential',
-              delay: 5000, // delay exponencial começando em 5 segundos
-            },
-          },
+          buildSyncColigadaJobOptions(periodoLetivo, coligada.id),
         ),
       )
 
