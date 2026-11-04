@@ -49,6 +49,26 @@ export interface IdentidadeAlunoTotvsDto {
 export class TotvsService {
   private readonly logger = new Logger(TotvsService.name)
   private readonly tableCorpore = getTotvsTableName()
+
+  /**
+   * TOTVS_USAR_PROCEDURES_V2=true passa a chamar as versões otimizadas
+   * (PR_MGA_Consulta_Aluno_Ativacao_Acesso_v2 e
+   * PR_MGA_Consulta_Responsavel_Ativacao_Acesso_v2), que filtram por
+   * RA/CPF/pessoa antes de calcular. Padrão: false (originais), até o
+   * analista responsável validar as v2. As v2 precisam existir no banco
+   * usado por getTotvsTableName() (CORPORE_ERP em produção).
+   */
+  private readonly usarProceduresV2 =
+    (process.env.TOTVS_USAR_PROCEDURES_V2 ?? '').toLowerCase() === 'true'
+
+  private readonly procAlunoAtivacao = this.usarProceduresV2
+    ? 'PR_MGA_Consulta_Aluno_Ativacao_Acesso_v2'
+    : 'PR_MGA_Consulta_Aluno_Ativacao_Acesso'
+
+  private readonly procResponsavelAtivacao = this.usarProceduresV2
+    ? 'PR_MGA_Consulta_Responsavel_Ativacao_Acesso_v2'
+    : 'PR_MGA_Consulta_Responsavel_Ativacao_Acesso'
+
   private static readonly PROCEDURE_COLIGADA_ALIAS = new Map<number, number>([
     [6, 5],
   ])
@@ -119,12 +139,12 @@ export class TotvsService {
     const registroAcademicoSql = this.toSqlStringOrNull(CD_Registro_Academico)
 
     this.logger.log(
-      `Buscando alunos ativos — coligada solicitada ${coligada}, coligada procedure ${coligadaProcedure}, período ${periodoLetivo}`,
+      `Buscando alunos ativos — coligada solicitada ${coligada}, coligada procedure ${coligadaProcedure}, período ${periodoLetivo}, procedure ${this.procAlunoAtivacao}`,
     )
 
     const result = await this.prisma.$queryRawUnsafe<AlunoTotvsDto[]>(
       `
-      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Aluno_Ativacao_Acesso] '${periodoLetivoEscapado}', ${coligadaProcedure}, ${registroAcademicoSql}`,
+      EXEC ${this.tableCorpore}.[dbo].[${this.procAlunoAtivacao}] '${periodoLetivoEscapado}', ${coligadaProcedure}, ${registroAcademicoSql}`,
     )
 
     this.logger.log(
@@ -324,14 +344,14 @@ export class TotvsService {
     const cdRegistroAcademicoSql = this.toSqlStringOrNull(CD_Registro_Academico)
 
     this.logger.log(
-      `Buscando responsáveis para ativação — período ${CD_Periodo_Letivo}`,
+      `Buscando responsáveis para ativação — período ${CD_Periodo_Letivo}, procedure ${this.procResponsavelAtivacao}`,
     )
 
     const result = await this.prisma.$queryRawUnsafe<
       ResponsavelAtivacaoTotvsDto[]
     >(
       `
-      EXEC ${this.tableCorpore}.[dbo].[PR_MGA_Consulta_Responsavel_Ativacao_Acesso] '${periodoLetivoEscapado}', ${cdPessoaSql}, ${cdCpfSql}, ${cdRegistroAcademicoSql}`,
+      EXEC ${this.tableCorpore}.[dbo].[${this.procResponsavelAtivacao}] '${periodoLetivoEscapado}', ${cdPessoaSql}, ${cdCpfSql}, ${cdRegistroAcademicoSql}`,
     )
 
     this.logger.log(

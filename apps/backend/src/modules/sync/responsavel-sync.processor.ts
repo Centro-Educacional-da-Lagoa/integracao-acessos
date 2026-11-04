@@ -10,6 +10,7 @@ import {
   deduplicarAlocacoesAtivas,
   parseAlocacoesAtivasJson,
 } from './utils/alocacoes-ativas'
+import { RESPONSAVEL_SYNC_CONCURRENCY } from './utils/queue-concurrency'
 
 type ResponsavelTotvsDto =
   | ResponsavelCancelamentoTotvsDto
@@ -68,6 +69,31 @@ export class ResponsavelSyncProcessor {
     private readonly accessProvisioningService: AccessProvisioningService,
   ) {}
 
+  /**
+   * Processador único da fila `responsavel-sync`.
+   *
+   * No Bull, cada `@Process('nome')` da mesma fila soma a sua concorrência
+   * (padrão 1): com 4 handlers nomeados, até 4 jobs rodavam ao mesmo
+   * tempo por instância. Agora há um só processador e a concorrência total
+   * da fila é RESPONSAVEL_SYNC_CONCURRENCY (variável de ambiente, padrão 1).
+   * Ver utils/queue-concurrency.ts.
+   */
+  @Process({ name: '*', concurrency: RESPONSAVEL_SYNC_CONCURRENCY })
+  async dispatch(job: Job<unknown>): Promise<void> {
+    switch (job.name) {
+      case 'cancelamentos-responsavel':
+        return this.handleCancelamentosResponsavel(job as Job<never>)
+      case 'sync-responsaveis':
+        return this.handleSyncResponsaveis(job as Job<never>)
+      case 'sync-responsavel-unitario':
+        return this.handleSyncResponsavelUnitario(job as Job<never>)
+      case 'cancelamento-responsavel-unitario':
+        return this.handleCancelamentoResponsavelUnitario(job as Job<never>)
+      default:
+        throw new Error(`Job desconhecido na fila responsavel-sync: ${job.name}`)
+    }
+  }
+
   private async addResponsavelProcessorJob<T>(
     name: string,
     data: T,
@@ -114,7 +140,6 @@ export class ResponsavelSyncProcessor {
     ].join(':')
   }
 
-  @Process('cancelamentos-responsavel')
   async handleCancelamentosResponsavel(
     job: Job<CancelamentoResponsavelLoteJobData>,
   ): Promise<void> {
@@ -134,7 +159,6 @@ export class ResponsavelSyncProcessor {
     )
   }
 
-  @Process('sync-responsaveis')
   async handleSyncResponsaveis(
     job: Job<AtivacaoResponsavelLoteJobData>,
   ): Promise<void> {
@@ -151,7 +175,6 @@ export class ResponsavelSyncProcessor {
     )
   }
 
-  @Process('sync-responsavel-unitario')
   async handleSyncResponsavelUnitario(
     job: Job<AtivacaoResponsavelUnitarioJobData>,
   ): Promise<void> {
@@ -165,7 +188,6 @@ export class ResponsavelSyncProcessor {
     await this.syncResponsavelUnitario(job.data)
   }
 
-  @Process('cancelamento-responsavel-unitario')
   async handleCancelamentoResponsavelUnitario(
     job: Job<CancelamentoResponsavelUnitarioJobData>,
   ): Promise<void> {
